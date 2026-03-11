@@ -203,10 +203,93 @@ func main() {
 	pools, err := client.ListIPPools(ctx, cfg.ADOM)
 	resources = append(resources, resource{"IP Pools", len(pools), err})
 
+	zones, err := client.ListZones(ctx, cfg.ADOM)
+	resources = append(resources, resource{"Zones", len(zones), err})
+
+	avProfiles, err := client.ListAntivirusProfiles(ctx, cfg.ADOM)
+	resources = append(resources, resource{"Antivirus Profiles", len(avProfiles), err})
+
+	ipsSensors, err := client.ListIPSSensors(ctx, cfg.ADOM)
+	resources = append(resources, resource{"IPS Sensors", len(ipsSensors), err})
+
+	wfProfiles, err := client.ListWebFilterProfiles(ctx, cfg.ADOM)
+	resources = append(resources, resource{"Web Filter Profiles", len(wfProfiles), err})
+
+	appProfiles, err := client.ListAppControlProfiles(ctx, cfg.ADOM)
+	resources = append(resources, resource{"App Control Profiles", len(appProfiles), err})
+
+	sslProfiles, err := client.ListSSLSSHProfiles(ctx, cfg.ADOM)
+	resources = append(resources, resource{"SSL/SSH Profiles", len(sslProfiles), err})
+
+	users, err := client.ListUsers(ctx, cfg.ADOM)
+	resources = append(resources, resource{"Users", len(users), err})
+
+	userGroups, err := client.ListUserGroups(ctx, cfg.ADOM)
+	resources = append(resources, resource{"User Groups", len(userGroups), err})
+
+	ldapServers, err := client.ListLDAPServers(ctx, cfg.ADOM)
+	resources = append(resources, resource{"LDAP Servers", len(ldapServers), err})
+
+	radiusServers, err := client.ListRADIUSServers(ctx, cfg.ADOM)
+	resources = append(resources, resource{"RADIUS Servers", len(radiusServers), err})
+
+	phase1, err := client.ListIPSecPhase1(ctx, cfg.ADOM)
+	resources = append(resources, resource{"IPSec Phase 1", len(phase1), err})
+
+	phase2, err := client.ListIPSecPhase2(ctx, cfg.ADOM)
+	resources = append(resources, resource{"IPSec Phase 2", len(phase2), err})
+
+	// Device-scoped resources (VDOMs, interfaces, routes).
+	var allVDOMs []fortimgr.VDOM
+	var allInterfaces []fortimgr.Interface
+	var allRoutes []fortimgr.StaticRoute
+	for _, d := range devices {
+		vdoms, err := client.ListVDOMs(ctx, d.Name)
+		if err != nil {
+			fmt.Printf("  VDOMs(%s): %v\n", d.Name, err)
+			continue
+		}
+		allVDOMs = append(allVDOMs, vdoms...)
+		for _, v := range vdoms {
+			ifaces, err := client.ListInterfaces(ctx, d.Name, v.Name)
+			if err != nil {
+				fmt.Printf("  Interfaces(%s/%s): %v\n", d.Name, v.Name, err)
+				continue
+			}
+			allInterfaces = append(allInterfaces, ifaces...)
+
+			routes, err := client.ListStaticRoutes(ctx, d.Name, v.Name)
+			if err != nil {
+				fmt.Printf("  Routes(%s/%s): %v\n", d.Name, v.Name, err)
+				continue
+			}
+			allRoutes = append(allRoutes, routes...)
+		}
+	}
+
+	// System status.
+	sysStatus, sysErr := client.SystemStatus(ctx)
+
+	// Device firmware.
+	firmware, fwErr := client.ListDeviceFirmware(ctx)
+
 	// Summary table.
 	fmt.Fprintf(w, "RESOURCE\tCOUNT\tSTATUS\n")
+	if sysErr != nil {
+		fmt.Fprintf(w, "System Status\t0\t%s\n", sysErr)
+	} else {
+		fmt.Fprintf(w, "System Status\t1\t%s %s (build %d)\n", sysStatus.Hostname, sysStatus.Version, sysStatus.Build)
+	}
 	fmt.Fprintf(w, "ADOMs\t%d\tOK\n", len(adoms))
 	fmt.Fprintf(w, "Devices\t%d\tOK\n", len(devices))
+	fmt.Fprintf(w, "VDOMs\t%d\tOK\n", len(allVDOMs))
+	fmt.Fprintf(w, "Interfaces\t%d\tOK\n", len(allInterfaces))
+	fmt.Fprintf(w, "Static Routes\t%d\tOK\n", len(allRoutes))
+	if fwErr != nil {
+		fmt.Fprintf(w, "Device Firmware\t0\t%s\n", fwErr)
+	} else {
+		fmt.Fprintf(w, "Device Firmware\t%d\tOK\n", len(firmware))
+	}
 	for _, r := range resources {
 		status := "OK"
 		if r.err != nil {
@@ -231,6 +314,25 @@ func main() {
 	writeSample("schedules_onetime", firstN(onetime, 5))
 	writeSample("virtual_ips", firstN(virtualIPs, 5))
 	writeSample("ip_pools", firstN(pools, 5))
+	writeSample("zones", firstN(zones, 5))
+	writeSample("antivirus_profiles", firstN(avProfiles, 5))
+	writeSample("ips_sensors", firstN(ipsSensors, 5))
+	writeSample("webfilter_profiles", firstN(wfProfiles, 5))
+	writeSample("appcontrol_profiles", firstN(appProfiles, 5))
+	writeSample("sslssh_profiles", firstN(sslProfiles, 5))
+	writeSample("users", firstN(users, 5))
+	writeSample("user_groups", firstN(userGroups, 5))
+	writeSample("ldap_servers", firstN(ldapServers, 5))
+	writeSample("radius_servers", firstN(radiusServers, 5))
+	writeSample("ipsec_phase1", firstN(phase1, 5))
+	writeSample("ipsec_phase2", firstN(phase2, 5))
+	writeSample("vdoms", firstN(allVDOMs, 5))
+	writeSample("interfaces", firstN(allInterfaces, 10))
+	writeSample("static_routes", firstN(allRoutes, 10))
+	if sysStatus != nil {
+		writeSample("system_status", sysStatus)
+	}
+	writeSample("device_firmware", firstN(firmware, 10))
 }
 
 // firstN returns the first n items from a slice (or all if fewer).

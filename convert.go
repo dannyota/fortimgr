@@ -180,6 +180,87 @@ var adomModes = map[string]string{
 	"1": "normal", "2": "backup",
 }
 
+var vdomOpModes = map[string]string{
+	"0": "nat", "1": "transparent",
+}
+
+var interfaceTypes = map[string]string{
+	"0": "physical", "1": "vlan", "2": "aggregate", "3": "redundant",
+	"4": "tunnel", "5": "wireless", "6": "vdom-link", "7": "loopback",
+}
+
+var interfaceStatuses = map[string]string{
+	"0": "down", "1": "up",
+}
+
+var userTypes = map[string]string{
+	"1": "local", "2": "radius", "3": "tacacs+", "4": "ldap",
+}
+
+var userGroupTypes = map[string]string{
+	"0": "firewall", "1": "fsso-service", "2": "rsso", "3": "guest",
+}
+
+var ldapTypes = map[string]string{
+	"0": "simple", "1": "anonymous", "2": "regular",
+}
+
+var ldapSecure = map[string]string{
+	"0": "disable", "1": "starttls", "2": "ldaps",
+}
+
+var radiusAuthTypes = map[string]string{
+	"0": "auto", "1": "ms_chap_v2", "2": "ms_chap", "3": "chap", "4": "pap",
+}
+
+var ipsecModes = map[string]string{
+	"0": "main", "1": "aggressive",
+}
+
+var ipsecTypes = map[string]string{
+	"0": "static", "1": "dynamic", "2": "ddns",
+}
+
+var scanModes = map[string]string{
+	"0": "default", "1": "legacy", "2": "full",
+}
+
+var featureSets = map[string]string{
+	"0": "flow", "1": "proxy",
+}
+
+var botnetConnections = map[string]string{
+	"0": "disable", "1": "block", "2": "monitor",
+}
+
+var unknownAppActions = map[string]string{
+	"0": "pass", "1": "block",
+}
+
+var inspectionModes = map[string]string{
+	"0": "proxy", "1": "flow-based", "2": "dns",
+}
+
+var serverCertModes = map[string]string{
+	"0": "re-sign", "1": "replace",
+}
+
+var supportedALPN = map[string]string{
+	"0": "none", "1": "http1-1", "2": "http2", "3": "all",
+}
+
+var intrazoneTraffic = map[string]string{
+	"0": "allow", "1": "deny",
+}
+
+var interfaceRoles = map[string]string{
+	"0": "lan", "1": "wan", "2": "dmz", "3": "undefined",
+}
+
+var interfaceModes = map[string]string{
+	"0": "static", "1": "dhcp", "2": "pppoe",
+}
+
 // mapEnum maps a numeric string to a named value.
 // Named strings (non-numeric) pass through unchanged.
 func mapEnum(v string, m map[string]string) string {

@@ -14,6 +14,14 @@ import (
 // result[0].data). The server is cleaned up when the test finishes.
 func newTestClient(t *testing.T, fixtures map[string]string) *Client {
 	t.Helper()
+	return newTestClientWithProxy(t, fixtures, nil)
+}
+
+// newTestClientWithProxy creates a test client with both forward and proxy fixtures.
+// forwardFixtures are served via /cgi-bin/module/forward (result[0].data).
+// proxyFixtures are served via /cgi-bin/module/flatui_proxy (result[0].data).
+func newTestClientWithProxy(t *testing.T, forwardFixtures, proxyFixtures map[string]string) *Client {
+	t.Helper()
 
 	mux := http.NewServeMux()
 
@@ -44,13 +52,43 @@ func newTestClient(t *testing.T, fixtures map[string]string) *Client {
 		}
 
 		apiURL := req.Params[0].URL
-		data, ok := fixtures[apiURL]
+		data, ok := forwardFixtures[apiURL]
 		if !ok {
 			fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":-2,"message":"unknown url: %s"}}]}}`, apiURL)
 			return
 		}
 
 		fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":%s}]}}`, data)
+	})
+
+	mux.HandleFunc("/cgi-bin/module/flatui_proxy", func(w http.ResponseWriter, r *http.Request) {
+		if token := r.Header.Get("xsrf-token"); token != "test-token" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+
+		var req struct {
+			URL    string `json:"url"`
+			Method string `json:"method"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		// Use "url:method" as lookup key to support custom methods.
+		key := req.URL
+		data, ok := proxyFixtures[key]
+		if !ok {
+			// Try with method suffix.
+			data, ok = proxyFixtures[req.URL+":"+req.Method]
+		}
+		if !ok {
+			fmt.Fprintf(w, `{"result":[{"status":{"code":-2,"message":"unknown url: %s"}}]}`, req.URL)
+			return
+		}
+
+		fmt.Fprintf(w, `{"result":[{"status":{"code":0,"message":"OK"},"data":%s}]}`, data)
 	})
 
 	server := httptest.NewServer(mux)
