@@ -62,20 +62,26 @@ X-CSRFToken: <token>
 
 ```
 danny.vn/fortimgr/
-├── client.go       # Client, NewClient, Login, Logout, Close
-├── option.go       # WithCredentials, WithInsecureTLS, WithTimeout, WithTransport
-├── request.go      # FlatUI request envelope, ID counter, forward method
-├── response.go     # Response unwrapping, error extraction
-├── errors.go       # ErrAuth, ErrPermission, ErrCertificate
-├── device.go       # ListDevices
-├── policy.go       # ListPolicyPackages, ListPolicies
-├── address.go      # ListAddresses, ListAddressGroups
-├── service.go      # ListServices, ListServiceGroups
-├── schedule.go     # ListSchedulesRecurring, ListSchedulesOnetime
-├── vip.go          # ListVIPs
-├── ippool.go       # ListIPPools
-├── types.go        # Device, Policy, Address, etc.
-└── convert.go      # Subnet/IP formatting helpers
+├── client.go             # Client, NewClient, Login, Logout, Close
+├── option.go             # WithCredentials, WithInsecureTLS, WithTimeout, etc.
+├── request.go            # FlatUI request envelope, forward method, generic get[T]
+├── response.go           # Response unwrapping, error extraction
+├── errors.go             # ErrAuth, ErrPermission, ErrCertificate, ErrNotLoggedIn
+├── types.go              # Device, Policy, Address, etc.
+├── convert.go            # Subnet/IP/schedule formatting helpers
+├── device.go             # ListDevices
+├── policy.go             # ListPolicyPackages, ListPolicies
+├── address.go            # ListAddresses, ListAddressGroups
+├── service.go            # ListServices, ListServiceGroups
+├── schedule.go           # ListSchedulesRecurring, ListSchedulesOnetime
+├── virtualip.go          # ListVirtualIPs
+├── ippool.go             # ListIPPools
+├── testhelper_test.go    # Shared httptest server for unit tests
+├── client_test.go        # NewClient, Login, Logout tests
+├── convert_test.go       # Table-driven conversion tests
+├── response_test.go      # checkResponse edge cases
+├── *_test.go             # Resource method tests (device, policy, etc.)
+└── smoke.go         # Live FortiManager smoke test (go run, env vars)
 ```
 
 ## 🏛️ Design Decisions
@@ -87,6 +93,8 @@ danny.vn/fortimgr/
 | Explicit Login/Logout | No hidden network calls, visible session lifecycle |
 | Read-only | Inventory/audit use case only, write operations too risky on undocumented API |
 | ADOM parameter | All resources scoped to Administrative Domain (default: `"root"`) |
+| Generic `get[T]` | Type-safe unmarshalling, eliminates boilerplate across resource methods |
+| Separate DTOs | API structs stay unexported; public types have clean field names |
 
 ## ⚠️ TLS
 

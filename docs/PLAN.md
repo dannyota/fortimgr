@@ -2,7 +2,7 @@
 
 Development roadmap for fortimgr.
 
-## 🏗️ Phase 1: Core Client
+## 🏗️ Phase 1: Core Client — ✅ Done
 
 | Component | Description |
 |-----------|-------------|
@@ -13,7 +13,7 @@ Development roadmap for fortimgr.
 | Response unwrapping | Status code validation, error extraction |
 | Functional options | `WithCredentials`, `WithInsecureTLS`, `WithTimeout`, `WithTransport` |
 
-## 📦 Phase 2: Resource Methods
+## 📦 Phase 2: Resource Methods — ✅ Done
 
 ADOM-scoped read operations:
 
@@ -28,17 +28,16 @@ ADOM-scoped read operations:
 | `ListServiceGroups(ctx, adom)` | Service group objects |
 | `ListSchedulesRecurring(ctx, adom)` | Recurring schedules |
 | `ListSchedulesOnetime(ctx, adom)` | One-time schedules |
-| `ListVIPs(ctx, adom)` | Virtual IP / port forwarding objects |
+| `ListVirtualIPs(ctx, adom)` | Virtual IP / port forwarding objects |
 | `ListIPPools(ctx, adom)` | NAT IP pool objects |
 
-## ✅ Phase 3: Quality
+## ✅ Phase 3: Quality — ✅ Done
 
 | Task | Description |
 |------|-------------|
-| Unit tests | HTTP test server mocks |
-| Integration tests | Opt-in, requires live FortiManager |
+| Unit tests | httptest-based mock server, table-driven conversion tests |
+| Smoke test | Live FortiManager test (env-var credentials, `go run smoke.go`) |
 | GoDoc | Comments on all exported types and methods |
-| CI | Lint, test, vet |
 
 ## 🔮 Phase 4: Extended Resources
 

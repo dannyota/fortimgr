@@ -20,3 +20,9 @@
 # OS
 .DS_Store
 Thumbs.db
+
+# Credentials
+.fortimgr.json
+
+# Smoke test output (contains real data)
+samples/
