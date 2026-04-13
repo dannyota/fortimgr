@@ -1,8 +1,45 @@
 # Changelog
 
+## v1.1.0
+
+Transparent pagination for every `List*` method, change-management audit trail, ADOM-level interface abstraction, device license metadata, and a security hardening on `ListDevices`. Every v1.0.3 symbol stays intact — all additions are backwards-compatible variadic options.
+
+### Pagination (30 `List*` methods)
+
+- **`ListOption`** — new variadic option type accepted by 30 of the SDK's 33 `List*` methods. Three methods deliberately do NOT accept it:
+  - **`ListADOMs`** — existing variadic `all ...bool` collides with `opts ...ListOption`; ADOM count is hard-capped by the FortiManager license (~20–100 max), so paging is unnecessary.
+  - **`ListDeviceFirmware`** — uses `flatui_proxy` with a grouping method call; not a range-paginatable list.
+  - **`ListPackageInstallStatus`** — `/pm/config/adom/{adom}/_package/status` ignores the `range` parameter by FortiManager design: passing `range:[999999,1]` still returns the full dataset. The endpoint always returns every row in one response, so accepting page options would be misleading.
+- **`WithPageSize(n)`** — override the default page size (1000 rows per forward request). Valid range 1..10000; values outside silently fall back to the default.
+- **`WithPageCallback(fn)`** — register a progress callback invoked after each page is fetched. `fn` receives `(cumulative fetched count, 1-based page number)`. Useful for streaming large lists or reporting progress on multi-second fetches.
+- **Default behavior** — every paginated List method transparently fetches every page and returns the concatenated result. Previously, the SDK passed no `range` parameter at all — which silently truncated results on FortiManager versions or endpoints with implicit row caps. **If your deployment has ADOMs with thousands of policies, addresses, services, revisions, or workflow sessions, v1.1.0 is the first release that reliably returns all of them.**
+- **Robustness** — `getPaged` terminates safely on four conditions: under-full page (normal end), over-full page (endpoint ignored range despite the SDK routing it through `getPaged`), byte-identical page 2 (endpoint ignored offset on a same-size dataset), and a hard safety cap of 10000 iterations. These safety nets guard against future FortiManager behavior changes; production methods only route through `getPaged` after the endpoint has been verified to honor the `range` parameter.
+- **Security** — `ListDevices` switched from `getExtra` to `getPaged` but still carries the `fields` allowlist on every per-page request, so encrypted credentials (`adm_pass`, `private_key`, `psk`) continue to never transit the wire.
+- Example:
+  ```go
+  addrs, _ := client.ListAddresses(ctx, "root",
+      fortimgr.WithPageSize(500),
+      fortimgr.WithPageCallback(func(fetched, page int) {
+          log.Printf("fetched %d addresses so far (page %d)", fetched, page)
+      }),
+  )
+  ```
+
+### Added
+
+- **`ListADOMRevisions(ctx, adom) ([]ADOMRevision, error)`** — returns the ADOM revision history from `/dvmdb/adom/{adom}/revision`. Each entry has `Version`, `Name`, `Desc`, `CreatedBy`, `CreatedAt`, `Locked`. Joins against `WorkflowSession.RevisionID` for per-change-request traceability and against policy install status for full "what was deployed when" views.
+- **`ListWorkflowSessions(ctx, adom) ([]WorkflowSession, error)`** — returns the workflow audit trail from `/dvmdb/adom/{adom}/workflow`. Captures who created each change request, who submitted it, who audited/approved it, which revision it produced, and a best-effort `State` string (FortiManager's state enum is not fully documented; `"3": "approved"` is observed and mapped, unknown ints pass through unchanged). Sessions with all three timestamps populated represent the completed approval chain.
+- **`ListNormalizedInterfaces(ctx, adom) ([]NormalizedInterface, error)`** — returns the ADOM-level normalized interface abstraction from `/pm/config/adom/{adom}/obj/dynamic/interface`. Normalized interfaces are the names policies actually reference (e.g. `wan1`, `internal`), and each has a `Mappings` slice that resolves per-device to physical interface names. The SDK fans out the nested `_scope` array into individual `NormalizedInterfaceMapping` rows so downstream consumers can iterate without nested loops. This closes the gap between policies (which reference normalized names) and physical interfaces from `ListInterfaces`.
+- **`Device` struct — 10 new `License*` fields** — `LicenseExpire`, `LicenseOverdueSince`, `LicenseMaxCPU`, `LicenseMaxRAM`, `LicenseUTMEnabled`, `LicenseType`, `LicenseInstalledAt`, `LicenseLastSync`, `LicenseRegion`, `LicenseFlags`. Populated from the same `/dvmdb/adom/{adom}/device` response. The `VMLicense`-style fields only populate for VM-licensed FortiGates. **None of these fields carries the license activation key** — FortiManager does not persist activation keys, only status, capacity, expiry, and region metadata.
+
+### Changed
+
+- **`ListDevices` switched to a server-side `fields` allowlist.** The SDK now passes `fields: [...]` with an explicit list of 29 safe field names when calling `/dvmdb/adom/{adom}/device`, so encrypted device credentials (`adm_pass`, `private_key`, `psk`, `private_key_status`) are **never sent by FortiManager to the SDK process**. Verified against a live FortiManager: response goes from 102 fields to 30 fields, and every known credential field is absent from the filtered response. A compile-time-enforced test (`TestListDevices/fields_allowlist_excludes_credentials`) guards against future edits that might accidentally add a credential to the allowlist.
+- `ListDevices`' response payload is ~70% smaller per device as a side-effect of the allowlist.
+
 ## v1.0.3
 
-Downstream-requested improvements for the hotpot data warehouse — policy install status, richer device sync state, and per-member HA role. Fully backwards compatible: every v1.0.2 symbol stays intact, all additions go to the end of existing structs so positional literals keep compiling.
+Improvements for downstream audit-warehouse consumers — policy install status, richer device sync state, and per-member HA role. Fully backwards compatible: every v1.0.2 symbol stays intact, all additions go to the end of existing structs so positional literals keep compiling.
 
 ### Added
 
