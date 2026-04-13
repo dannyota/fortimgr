@@ -136,3 +136,40 @@ func TestListIPSecPhase2(t *testing.T) {
 		}
 	})
 }
+
+func TestIPSecTunnelSelectorAliases(t *testing.T) {
+	// The friendlier names should return the same data as the phase1/phase2
+	// methods and the types should be interchangeable (type aliases).
+	client := newTestClient(t, map[string]string{
+		"/pm/config/adom/root/obj/vpn/ipsec/phase1-interface": `[
+			{"name": "t1", "interface": "wan1", "remote-gw": "1.2.3.4", "mode": 0, "type": 0}
+		]`,
+		"/pm/config/adom/root/obj/vpn/ipsec/phase2-interface": `[
+			{"name": "s1", "phase1name": "t1", "src-subnet": ["10.0.0.0","255.255.255.0"], "dst-subnet": ["10.1.0.0","255.255.255.0"]}
+		]`,
+	})
+
+	tunnels, err := client.ListIPSecTunnels(context.Background(), "root")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tunnels) != 1 || tunnels[0].Name != "t1" || tunnels[0].RemoteGW != "1.2.3.4" {
+		t.Fatalf("tunnels = %+v", tunnels)
+	}
+
+	selectors, err := client.ListIPSecSelectors(context.Background(), "root")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(selectors) != 1 || selectors[0].Name != "s1" || selectors[0].Tunnel != "t1" {
+		t.Fatalf("selectors = %+v", selectors)
+	}
+
+	// Type-alias interchangeability: an IPSecTunnel value is assignable to an
+	// IPSecPhase1 variable and vice-versa with no conversion.
+	var asPhase1 IPSecPhase1 = tunnels[0]
+	var asTunnel IPSecTunnel = asPhase1
+	if asTunnel.Name != "t1" {
+		t.Errorf("alias round-trip failed: %+v", asTunnel)
+	}
+}

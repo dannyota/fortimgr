@@ -57,6 +57,43 @@ func (c *Client) ListIPSecPhase1(ctx context.Context, adom string) ([]IPSecPhase
 	return tunnels, nil
 }
 
+// IPSecTunnel is a type alias for IPSecPhase1 matching FortiGate GUI
+// terminology (phase1-interface → "VPN tunnel"). The field set is
+// identical; use ListIPSecTunnels as the preferred entry point.
+type IPSecTunnel = IPSecPhase1
+
+// ListIPSecTunnels is a friendlier alias for ListIPSecPhase1. It returns
+// IPSec Phase 1 interface configurations (tunnels, in FortiGate GUI terms).
+// Shares all logic with ListIPSecPhase1 — IPSecTunnel is a type alias.
+func (c *Client) ListIPSecTunnels(ctx context.Context, adom string) ([]IPSecTunnel, error) {
+	return c.ListIPSecPhase1(ctx, adom)
+}
+
+// ListIPSecSelectors returns IPSec quick-mode selectors (Phase 2 entries,
+// called "VPN selectors" in the FortiGate GUI), each bound to a parent
+// tunnel via the Tunnel field. IPSecSelector is a distinct type from
+// IPSecPhase2 so the Phase1Name -> Tunnel rename does not break existing
+// ListIPSecPhase2 callers. Both share the same API fetch and transformation
+// — this function delegates to ListIPSecPhase2 and re-labels the result.
+func (c *Client) ListIPSecSelectors(ctx context.Context, adom string) ([]IPSecSelector, error) {
+	phases, err := c.ListIPSecPhase2(ctx, adom)
+	if err != nil {
+		return nil, err
+	}
+	selectors := make([]IPSecSelector, len(phases))
+	for i, p := range phases {
+		selectors[i] = IPSecSelector{
+			Name:      p.Name,
+			Tunnel:    p.Phase1Name,
+			Proposal:  p.Proposal,
+			SrcSubnet: p.SrcSubnet,
+			DstSubnet: p.DstSubnet,
+			Comments:  p.Comments,
+		}
+	}
+	return selectors, nil
+}
+
 // ListIPSecPhase2 retrieves IPSec Phase 2 interface configurations from an ADOM.
 func (c *Client) ListIPSecPhase2(ctx context.Context, adom string) ([]IPSecPhase2, error) {
 	if !c.LoggedIn() {

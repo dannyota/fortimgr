@@ -285,6 +285,18 @@ type IPSecPhase2 struct {
 	Comments   string
 }
 
+// IPSecSelector represents an IPSec quick-mode selector, the friendlier
+// FortiGate-GUI-aligned view of a Phase 2 entry. Each selector is bound
+// to a parent tunnel via the Tunnel field.
+type IPSecSelector struct {
+	Name      string
+	Tunnel    string // parent IPSec tunnel (phase 1) name
+	Proposal  string
+	SrcSubnet string
+	DstSubnet string
+	Comments  string
+}
+
 // SystemStatus represents FortiManager system status.
 type SystemStatus struct {
 	Hostname     string
