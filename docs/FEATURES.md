@@ -28,7 +28,7 @@ FlatUI uses the same internal API paths as JSON-RPC — the difference is the tr
 
 | Resource | SDK Method | API Endpoint | Status |
 |----------|-----------|--------------|:------:|
-| Devices | `ListDevices(adom)` | `/dvmdb/adom/{adom}/device` | Done |
+| Devices | `ListDevices(adom)` | `/dvmdb/adom/{adom}/device` | Done¹ |
 | VDOMs | `ListVDOMs(device)` | `/dvmdb/device/{device}/vdom` | Done |
 | Interfaces | `ListInterfaces(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/system/interface` | Done |
 | Static routes | `ListStaticRoutes(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/router/static` | Done |
@@ -37,6 +37,8 @@ FlatUI uses the same internal API paths as JSON-RPC — the difference is the tr
 
 Write operations (`add/device`, `del/device`) — not supported (read-only SDK).
 
+¹ Since v1.0.3, `Device` carries extra sync-state fields from the same endpoint: `Hostname`, `ConfStatus` (`"unknown"` / `"insync"` / `"modified"`), `DevStatus` (`"auto_updated"` / `"installed"` / `"aborted"` / …), `LastChecked`, `LastResync`, `HARole`, and `HAMembers`. `HAMembers` is a `[]HAMember` slice that exposes every FortiGate inside an HA cluster (including the standby) — FortiManager models each HA cluster as one top-level device row with the primary's hostname, so `ListDevices` never returns passive members as separate rows; they only appear inside `HAMembers`. See the godoc for the full list.
+
 ## 🛡️ Firewall Policy
 
 | Resource | SDK Method | API Endpoint | Status |
@@ -44,6 +46,7 @@ Write operations (`add/device`, `del/device`) — not supported (read-only SDK).
 | Policy packages | `ListPolicyPackages(adom)` | `/pm/pkg/adom/{adom}` | Done |
 | Policies | `ListPolicies(adom, pkg)` | `/pm/config/adom/{adom}/pkg/{pkg}/firewall/policy` | Done |
 | Package scope | Included in package response | Same | Done |
+| Package install status | `ListPackageInstallStatus(adom, pkg)` | `/pm/config/adom/{adom}/_package/status` | Done |
 | Policy hit count | — | `EXEC /sys/hitcount` | — |
 
 Write operations (`SET/ADD/DELETE`) — not supported (read-only SDK).

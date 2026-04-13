@@ -246,6 +246,9 @@ func main() {
 	phase2, err := client.ListIPSecPhase2(ctx, cfg.ADOM)
 	resources = append(resources, resource{"IPSec Phase 2", len(phase2), err})
 
+	installStatus, err := client.ListPackageInstallStatus(ctx, cfg.ADOM, "")
+	resources = append(resources, resource{"Package Install Status", len(installStatus), err})
+
 	// Device-scoped resources (interfaces, routes). VDOMs are derived from the
 	// interface list's "vdom" field — this avoids /dvmdb/device/<dev>/vdom,
 	// which is permission-denied for restricted admins.
@@ -348,6 +351,7 @@ func main() {
 	writeSample("radius_servers", firstN(radiusServers, 5))
 	writeSample("ipsec_phase1", firstN(phase1, 5))
 	writeSample("ipsec_phase2", firstN(phase2, 5))
+	writeSample("package_install_status", installStatus)
 	writeSample("vdoms", firstN(allVDOMs, 5))
 	writeSample("interfaces", firstN(allInterfaces, 10))
 	writeSample("static_routes", firstN(allRoutes, 10))

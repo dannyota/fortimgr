@@ -5,6 +5,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // toString converts interface{} to string.
@@ -172,6 +173,43 @@ var deviceConnStates = map[string]string{
 	"0": "offline", "1": "online",
 }
 
+// confStatuses maps FortiManager's conf_status int to a named value.
+// Tracks whether the device's running config matches what FMG has on file.
+var confStatuses = map[string]string{
+	"0": "unknown",
+	"1": "insync",
+	"2": "modified",
+}
+
+// devStatuses maps FortiManager's dev_status int to a named value.
+// Tracks the operational state of the device from FMG's perspective.
+// Values are defined in the FortiManager DVMDB schema.
+var devStatuses = map[string]string{
+	"0":  "none",
+	"1":  "unknown",
+	"2":  "checked_in",
+	"3":  "in_progress",
+	"4":  "installed",
+	"5":  "aborted",
+	"6":  "sched",
+	"7":  "retry",
+	"8":  "canceled",
+	"9":  "pending",
+	"10": "retrieved",
+	"11": "changed_conf",
+	"12": "sync_fail",
+	"13": "timeout",
+	"14": "rev_revert",
+	"15": "auto_updated",
+}
+
+// haRoles maps ha_slave[*].role (0/1) to a named role. Unknown ints fall
+// back to the raw string via mapEnum's passthrough behavior.
+var haRoles = map[string]string{
+	"0": "slave",
+	"1": "master",
+}
+
 var adomStates = map[string]string{
 	"0": "disabled", "1": "enabled",
 }
@@ -311,6 +349,36 @@ func formatMappedIP(v any) string {
 	default:
 		return fmt.Sprintf("%v", val)
 	}
+}
+
+// unixToTime converts a FortiManager Unix timestamp to time.Time.
+// Returns the zero time.Time (IsZero() == true) when the value is nil,
+// zero, or otherwise invalid — FortiManager uses 0 to mean "never".
+func unixToTime(v any) time.Time {
+	if v == nil {
+		return time.Time{}
+	}
+	var sec int64
+	switch val := v.(type) {
+	case int:
+		sec = int64(val)
+	case int64:
+		sec = val
+	case float64:
+		sec = int64(val)
+	case string:
+		n, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return time.Time{}
+		}
+		sec = n
+	default:
+		return time.Time{}
+	}
+	if sec <= 0 {
+		return time.Time{}
+	}
+	return time.Unix(sec, 0).UTC()
 }
 
 // formatScheduleTime formats schedule time field.

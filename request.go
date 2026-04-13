@@ -97,6 +97,93 @@ func get[T any](ctx context.Context, c *Client, apiURL string) ([]T, error) {
 	return items, nil
 }
 
+// forwardExtra sends a FlatUI forward request whose params[0] merges extra
+// fields (e.g. "filter" or "option") alongside the URL. Used by endpoints
+// that require query-time filters.
+func (c *Client) forwardExtra(ctx context.Context, apiURL string, extra map[string]any) (json.RawMessage, error) {
+	data, err := c.doForwardExtra(ctx, apiURL, extra)
+	if err == ErrSessionExpired {
+		if loginErr := c.Login(ctx); loginErr != nil {
+			return nil, fmt.Errorf("fortimgr: re-login after session expired: %w", loginErr)
+		}
+		return c.doForwardExtra(ctx, apiURL, extra)
+	}
+	return data, err
+}
+
+// doForwardExtra performs a single FlatUI forward request without retry,
+// merging extra keys into params[0].
+func (c *Client) doForwardExtra(ctx context.Context, apiURL string, extra map[string]any) (json.RawMessage, error) {
+	param := map[string]any{"url": apiURL}
+	for k, v := range extra {
+		if k == "url" {
+			continue
+		}
+		param[k] = v
+	}
+	payload := map[string]any{
+		"id":     atomic.AddInt64(&c.requestID, 1),
+		"method": "get",
+		"params": []map[string]any{param},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("fortimgr: marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", c.address+"/cgi-bin/module/forward", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("fortimgr: create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRFToken", c.csrfToken)
+	if c.config.userAgent != "" {
+		req.Header.Set("User-Agent", c.config.userAgent)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		if isCertificateError(err) {
+			return nil, fmt.Errorf("%w: %v", ErrCertificate, err)
+		}
+		return nil, fmt.Errorf("fortimgr: send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("fortimgr: read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fortimgr: HTTP %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result flatUIResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("fortimgr: parse response: %w", err)
+	}
+
+	return checkResponse(&result)
+}
+
+// getExtra forwards a request with extra params and unmarshals the data
+// payload into []T. Use this when the endpoint needs a filter, option, or
+// other field alongside the URL.
+func getExtra[T any](ctx context.Context, c *Client, apiURL string, extra map[string]any) ([]T, error) {
+	data, err := c.forwardExtra(ctx, apiURL, extra)
+	if err != nil {
+		return nil, err
+	}
+	var items []T
+	if err := json.Unmarshal(data, &items); err != nil {
+		return nil, fmt.Errorf("fortimgr: unmarshal response: %w", err)
+	}
+	return items, nil
+}
+
 // proxyRequest is the JSON body sent to /cgi-bin/module/flatui_proxy.
 type proxyRequest struct {
 	URL    string `json:"url"`

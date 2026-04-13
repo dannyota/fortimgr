@@ -1,5 +1,7 @@
 package fortimgr
 
+import "time"
+
 // ADOM represents an Administrative Domain in FortiManager.
 // ADOMs partition managed devices, policies, and objects into isolated scopes
 // for multi-tenant or delegated management. Most single-tenant deployments
@@ -13,17 +15,53 @@ type ADOM struct {
 }
 
 // Device represents a FortiGate device managed by FortiManager.
+//
+// Note on HA fields: the legacy HAMode field still conflates topology and
+// role (a historical quirk preserved for backwards compatibility — see
+// deviceHAModes in convert.go). New code should read HARole for the
+// device's role and treat HAMode as opaque until a future major version
+// cleanup. The raw FortiManager API exposes ha_mode (topology) and the
+// per-member role separately; HARole is derived from ha_slave[].
 type Device struct {
 	Name         string
 	DeviceID     string
 	SerialNumber string
 	Platform     string
 	Firmware     string // format: "7.2.5-b1517"
-	HAMode       string // "standalone", "master", "slave"
+	HAMode       string // "standalone", "master", "slave" — legacy, kept for compat
 	HAClusterID  string
 	Status       string // "online", "offline"
 	IPAddress    string
 	ADOM         string
+
+	// v1.0.3 additions — populated from /dvmdb/adom/{adom}/device.
+	Hostname    string    // hostname as reported by the FortiGate
+	ConfStatus  string    // "unknown", "insync", "modified"
+	DevStatus   string    // "none", "unknown", "auto_updated", "aborted", ... (see devStatuses)
+	LastChecked time.Time // when FortiManager last heard from the device; zero if never
+	LastResync  time.Time // when FortiManager last resync'd device config; zero if never
+	HARole      string    // "", "master", "slave" — role of the top-level record
+
+	// HAMembers holds every HA cluster member the FortiManager knows about for
+	// this device record. FortiManager models each HA cluster as a single
+	// top-level Device entry (with Name/Hostname set to the primary), so the
+	// secondary FortiGates in an active-passive pair never appear as standalone
+	// Device rows. HAMembers is the only place where standby members surface.
+	//
+	// For standalone FortiGates HAMembers is empty.
+	HAMembers []HAMember
+}
+
+// HAMember describes one FortiGate inside an HA cluster, as returned in the
+// ha_slave array of /dvmdb/adom/{adom}/device. This is how the SDK exposes
+// passive/secondary members — they do not appear as top-level Device entries
+// in ListDevices.
+type HAMember struct {
+	Name         string
+	SerialNumber string
+	Role         string // "master", "slave"
+	Status       string // "online", "offline"
+	ConfStatus   string // "unknown", "insync", "modified"
 }
 
 // PolicyPackage represents a policy package in FortiManager.
@@ -318,4 +356,21 @@ type DeviceFirmware struct {
 	CanUpgrade     bool
 	Connected      bool
 	LicenseValid   bool
+}
+
+// PackageInstallStatus represents the install state of a policy package on
+// a single device/VDOM target. The Status field distinguishes assignment
+// (device is on the scope list) from actual installation (config has been
+// pushed and is running on the FortiGate) — callers that want to verify
+// "this policy is actually enforcing" should check Status == "installed".
+//
+// The underlying /pm/config/adom/{adom}/_package/status endpoint does not
+// expose revision numbers, install time, or modify state. Callers that need
+// those should join against ADOM revision history (landing in v1.1.0).
+type PackageInstallStatus struct {
+	ADOM    string
+	Package string
+	Device  string
+	VDOM    string
+	Status  string // "installed", "modified", "never", "unknown", "imported"
 }
