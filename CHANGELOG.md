@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.0.2
+
+Friendlier IPsec naming matching the FortiGate GUI. Fully backwards compatible — no v1.0.1 symbol was renamed or removed.
+
+### Added
+
+- **`IPSecTunnel`** — zero-cost type alias for `IPSecPhase1` (`type IPSecTunnel = IPSecPhase1`). Values are interchangeable with no conversion.
+- **`ListIPSecTunnels(ctx, adom)`** — one-line wrapper around `ListIPSecPhase1`. Shares all logic via the type alias.
+- **`IPSecSelector`** — new struct mirroring `IPSecPhase2` with one field rename: `Phase1Name` → `Tunnel`. Kept as a distinct type (not an alias) so renaming the field on `IPSecPhase2` isn't required and v1.0.1 callers of `.Phase1Name` keep compiling.
+- **`ListIPSecSelectors(ctx, adom)`** — delegates to `ListIPSecPhase2` to reuse the HTTP/JSON/mapping path, then copies each result into an `IPSecSelector` with the renamed field. Single point of truth for the API call.
+
+### Rationale
+
+Phase 1 / Phase 2 are IKE-RFC terms that force users to translate in their heads. The FortiGate GUI calls them "tunnel" and "selector", so matching that makes call sites read naturally:
+
+```go
+// Before
+phase1, _ := c.ListIPSecPhase1(ctx, "root")
+phase2, _ := c.ListIPSecPhase2(ctx, "root")
+for _, p := range phase2 { fmt.Println(p.Phase1Name) }
+
+// After
+tunnels, _   := c.ListIPSecTunnels(ctx, "root")
+selectors, _ := c.ListIPSecSelectors(ctx, "root")
+for _, s := range selectors { fmt.Println(s.Tunnel) }
+```
+
 ## v1.0.1
 
 Bug fixes discovered while running the SDK against a live restricted-admin session.
