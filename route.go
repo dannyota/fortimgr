@@ -17,7 +17,8 @@ type apiStaticRoute struct {
 }
 
 // ListStaticRoutes retrieves static routes from a device VDOM.
-func (c *Client) ListStaticRoutes(ctx context.Context, device, vdom string) ([]StaticRoute, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListStaticRoutes(ctx context.Context, device, vdom string, opts ...ListOption) ([]StaticRoute, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -26,7 +27,7 @@ func (c *Client) ListStaticRoutes(ctx context.Context, device, vdom string) ([]S
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/device/%s/vdom/%s/router/static", device, vdom)
-	items, err := get[apiStaticRoute](ctx, c, apiURL)
+	items, err := getPaged[apiStaticRoute](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

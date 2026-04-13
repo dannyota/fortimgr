@@ -73,3 +73,63 @@ type withX509NegativeSerial struct{}
 
 func (withX509NegativeSerial) apply(c *clientConfig) { c.x509NegativeSerial = true }
 func WithX509NegativeSerial() ClientOption            { return withX509NegativeSerial{} }
+
+// listConfig holds resolved pagination options for a single List call.
+type listConfig struct {
+	pageSize int
+	onPage   func(fetched int, page int)
+}
+
+// ListOption configures pagination behavior for SDK List* methods.
+//
+// By default every List method transparently fetches all pages from the
+// FortiManager API (1000 rows per forward request) and returns the
+// concatenated result. Callers that want a different page size or a
+// progress callback pass ListOptions as variadic trailing arguments:
+//
+//	addrs, err := client.ListAddresses(ctx, "root",
+//	    fortimgr.WithPageSize(500),
+//	    fortimgr.WithPageCallback(func(fetched, page int) {
+//	        log.Printf("fetched %d addresses so far (page %d)", fetched, page)
+//	    }),
+//	)
+//
+// The uses a distinct method name (applyList) from ClientOption.apply so
+// the two option types coexist without collision.
+type ListOption interface {
+	applyList(*listConfig)
+}
+
+// listOptFunc adapts a plain func to the ListOption interface.
+type listOptFunc func(*listConfig)
+
+func (f listOptFunc) applyList(c *listConfig) { f(c) }
+
+// WithPageSize overrides the default page size (1000 rows per forward
+// request) for a single List call. Valid range is 1..10000; values
+// outside that range are silently ignored and the default is used.
+//
+// Smaller page sizes trade latency for lower per-request memory;
+// larger page sizes reduce round-trip count. 1000 is a good default
+// for most ADOMs.
+func WithPageSize(n int) ListOption {
+	return listOptFunc(func(c *listConfig) {
+		if n >= 1 && n <= 10000 {
+			c.pageSize = n
+		}
+	})
+}
+
+// WithPageCallback registers a function invoked after each page has
+// been fetched and appended to the result. fetched is the cumulative
+// row count; page is the 1-based page number that just completed.
+//
+// Useful for progress reporting on large lists. The callback runs
+// synchronously on the goroutine making the List call, so it should
+// not block for long. Returning from the callback does not abort the
+// fetch — use context cancellation on the parent ctx for early exit.
+func WithPageCallback(fn func(fetched, page int)) ListOption {
+	return listOptFunc(func(c *listConfig) {
+		c.onPage = fn
+	})
+}

@@ -12,7 +12,8 @@ type apiVDOM struct {
 }
 
 // ListVDOMs retrieves Virtual Domains from a FortiGate device.
-func (c *Client) ListVDOMs(ctx context.Context, device string) ([]VDOM, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListVDOMs(ctx context.Context, device string, opts ...ListOption) ([]VDOM, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -21,7 +22,7 @@ func (c *Client) ListVDOMs(ctx context.Context, device string) ([]VDOM, error) {
 	}
 
 	apiURL := fmt.Sprintf("/dvmdb/device/%s/vdom", device)
-	items, err := get[apiVDOM](ctx, c, apiURL)
+	items, err := getPaged[apiVDOM](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

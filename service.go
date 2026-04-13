@@ -20,7 +20,8 @@ type apiServiceGroup struct {
 }
 
 // ListServices retrieves firewall service objects from an ADOM.
-func (c *Client) ListServices(ctx context.Context, adom string) ([]Service, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListServices(ctx context.Context, adom string, opts ...ListOption) ([]Service, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -29,7 +30,7 @@ func (c *Client) ListServices(ctx context.Context, adom string) ([]Service, erro
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/firewall/service/custom", adom)
-	items, err := get[apiService](ctx, c, apiURL)
+	items, err := getPaged[apiService](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +50,8 @@ func (c *Client) ListServices(ctx context.Context, adom string) ([]Service, erro
 }
 
 // ListServiceGroups retrieves firewall service groups from an ADOM.
-func (c *Client) ListServiceGroups(ctx context.Context, adom string) ([]ServiceGroup, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListServiceGroups(ctx context.Context, adom string, opts ...ListOption) ([]ServiceGroup, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -58,7 +60,7 @@ func (c *Client) ListServiceGroups(ctx context.Context, adom string) ([]ServiceG
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/firewall/service/group", adom)
-	items, err := get[apiServiceGroup](ctx, c, apiURL)
+	items, err := getPaged[apiServiceGroup](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

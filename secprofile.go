@@ -60,7 +60,8 @@ type apiSSLSSHProfile struct {
 }
 
 // ListAntivirusProfiles retrieves antivirus profiles from an ADOM.
-func (c *Client) ListAntivirusProfiles(ctx context.Context, adom string) ([]AntivirusProfile, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListAntivirusProfiles(ctx context.Context, adom string, opts ...ListOption) ([]AntivirusProfile, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -69,7 +70,7 @@ func (c *Client) ListAntivirusProfiles(ctx context.Context, adom string) ([]Anti
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/antivirus/profile", adom)
-	items, err := get[apiAntivirusProfile](ctx, c, apiURL)
+	items, err := getPaged[apiAntivirusProfile](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +94,8 @@ func (c *Client) ListAntivirusProfiles(ctx context.Context, adom string) ([]Anti
 }
 
 // ListIPSSensors retrieves IPS sensors from an ADOM.
-func (c *Client) ListIPSSensors(ctx context.Context, adom string) ([]IPSSensor, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListIPSSensors(ctx context.Context, adom string, opts ...ListOption) ([]IPSSensor, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -102,7 +104,7 @@ func (c *Client) ListIPSSensors(ctx context.Context, adom string) ([]IPSSensor, 
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/ips/sensor", adom)
-	items, err := get[apiIPSSensor](ctx, c, apiURL)
+	items, err := getPaged[apiIPSSensor](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +124,8 @@ func (c *Client) ListIPSSensors(ctx context.Context, adom string) ([]IPSSensor, 
 }
 
 // ListWebFilterProfiles retrieves web filter profiles from an ADOM.
-func (c *Client) ListWebFilterProfiles(ctx context.Context, adom string) ([]WebFilterProfile, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListWebFilterProfiles(ctx context.Context, adom string, opts ...ListOption) ([]WebFilterProfile, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -131,7 +134,7 @@ func (c *Client) ListWebFilterProfiles(ctx context.Context, adom string) ([]WebF
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/webfilter/profile", adom)
-	items, err := get[apiWebFilterProfile](ctx, c, apiURL)
+	items, err := getPaged[apiWebFilterProfile](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +157,8 @@ func (c *Client) ListWebFilterProfiles(ctx context.Context, adom string) ([]WebF
 }
 
 // ListAppControlProfiles retrieves application control profiles from an ADOM.
-func (c *Client) ListAppControlProfiles(ctx context.Context, adom string) ([]AppControlProfile, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListAppControlProfiles(ctx context.Context, adom string, opts ...ListOption) ([]AppControlProfile, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -163,7 +167,7 @@ func (c *Client) ListAppControlProfiles(ctx context.Context, adom string) ([]App
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/application/list", adom)
-	items, err := get[apiAppControlProfile](ctx, c, apiURL)
+	items, err := getPaged[apiAppControlProfile](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +191,8 @@ func (c *Client) ListAppControlProfiles(ctx context.Context, adom string) ([]App
 }
 
 // ListSSLSSHProfiles retrieves SSL/SSH inspection profiles from an ADOM.
-func (c *Client) ListSSLSSHProfiles(ctx context.Context, adom string) ([]SSLSSHProfile, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListSSLSSHProfiles(ctx context.Context, adom string, opts ...ListOption) ([]SSLSSHProfile, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -196,7 +201,7 @@ func (c *Client) ListSSLSSHProfiles(ctx context.Context, adom string) ([]SSLSSHP
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/firewall/ssl-ssh-profile", adom)
-	items, err := get[apiSSLSSHProfile](ctx, c, apiURL)
+	items, err := getPaged[apiSSLSSHProfile](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

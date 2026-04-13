@@ -13,7 +13,8 @@ type apiZone struct {
 }
 
 // ListZones retrieves system zones from an ADOM.
-func (c *Client) ListZones(ctx context.Context, adom string) ([]Zone, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListZones(ctx context.Context, adom string, opts ...ListOption) ([]Zone, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -22,7 +23,7 @@ func (c *Client) ListZones(ctx context.Context, adom string) ([]Zone, error) {
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/system/zone", adom)
-	items, err := get[apiZone](ctx, c, apiURL)
+	items, err := getPaged[apiZone](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

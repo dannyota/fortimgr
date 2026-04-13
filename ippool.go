@@ -14,7 +14,8 @@ type apiIPPool struct {
 }
 
 // ListIPPools retrieves IP pools from an ADOM.
-func (c *Client) ListIPPools(ctx context.Context, adom string) ([]IPPool, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListIPPools(ctx context.Context, adom string, opts ...ListOption) ([]IPPool, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -23,7 +24,7 @@ func (c *Client) ListIPPools(ctx context.Context, adom string) ([]IPPool, error)
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/firewall/ippool", adom)
-	items, err := get[apiIPPool](ctx, c, apiURL)
+	items, err := getPaged[apiIPPool](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

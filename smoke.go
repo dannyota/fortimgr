@@ -186,7 +186,15 @@ func main() {
 	}
 	var resources []resource
 
-	addrs, err := client.ListAddresses(ctx, cfg.ADOM)
+	// Demonstrate WithPageCallback: print progress as each page lands.
+	// Default page size (1000) means most ADOMs return everything on
+	// page 1; this fires for exactly those deployments where pagination
+	// is meaningful.
+	addrs, err := client.ListAddresses(ctx, cfg.ADOM,
+		fortimgr.WithPageCallback(func(fetched, page int) {
+			fmt.Printf("  ListAddresses page %d → %d rows cumulative\n", page, fetched)
+		}),
+	)
 	resources = append(resources, resource{"Addresses", len(addrs), err})
 
 	groups, err := client.ListAddressGroups(ctx, cfg.ADOM)
@@ -248,6 +256,15 @@ func main() {
 
 	installStatus, err := client.ListPackageInstallStatus(ctx, cfg.ADOM, "")
 	resources = append(resources, resource{"Package Install Status", len(installStatus), err})
+
+	adomRevisions, err := client.ListADOMRevisions(ctx, cfg.ADOM)
+	resources = append(resources, resource{"ADOM Revisions", len(adomRevisions), err})
+
+	workflowSessions, err := client.ListWorkflowSessions(ctx, cfg.ADOM)
+	resources = append(resources, resource{"Workflow Sessions", len(workflowSessions), err})
+
+	normIfaces, err := client.ListNormalizedInterfaces(ctx, cfg.ADOM)
+	resources = append(resources, resource{"Normalized Interfaces", len(normIfaces), err})
 
 	// Device-scoped resources (interfaces, routes). VDOMs are derived from the
 	// interface list's "vdom" field — this avoids /dvmdb/device/<dev>/vdom,
@@ -352,6 +369,9 @@ func main() {
 	writeSample("ipsec_phase1", firstN(phase1, 5))
 	writeSample("ipsec_phase2", firstN(phase2, 5))
 	writeSample("package_install_status", installStatus)
+	writeSample("adom_revisions", firstN(adomRevisions, 10))
+	writeSample("workflow_sessions", firstN(workflowSessions, 10))
+	writeSample("normalized_interfaces", firstN(normIfaces, 10))
 	writeSample("vdoms", firstN(allVDOMs, 5))
 	writeSample("interfaces", firstN(allInterfaces, 10))
 	writeSample("static_routes", firstN(allRoutes, 10))

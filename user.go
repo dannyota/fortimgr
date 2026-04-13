@@ -36,7 +36,8 @@ type apiRADIUSServer struct {
 }
 
 // ListUsers retrieves local user objects from an ADOM.
-func (c *Client) ListUsers(ctx context.Context, adom string) ([]User, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListUsers(ctx context.Context, adom string, opts ...ListOption) ([]User, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -45,7 +46,7 @@ func (c *Client) ListUsers(ctx context.Context, adom string) ([]User, error) {
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/user/local", adom)
-	items, err := get[apiUser](ctx, c, apiURL)
+	items, err := getPaged[apiUser](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +65,8 @@ func (c *Client) ListUsers(ctx context.Context, adom string) ([]User, error) {
 }
 
 // ListUserGroups retrieves user groups from an ADOM.
-func (c *Client) ListUserGroups(ctx context.Context, adom string) ([]UserGroup, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListUserGroups(ctx context.Context, adom string, opts ...ListOption) ([]UserGroup, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -73,7 +75,7 @@ func (c *Client) ListUserGroups(ctx context.Context, adom string) ([]UserGroup, 
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/user/group", adom)
-	items, err := get[apiUserGroup](ctx, c, apiURL)
+	items, err := getPaged[apiUserGroup](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +95,8 @@ func (c *Client) ListUserGroups(ctx context.Context, adom string) ([]UserGroup, 
 
 // ListLDAPServers retrieves LDAP server configurations from an ADOM.
 // Credentials are intentionally excluded from the response.
-func (c *Client) ListLDAPServers(ctx context.Context, adom string) ([]LDAPServer, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListLDAPServers(ctx context.Context, adom string, opts ...ListOption) ([]LDAPServer, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -102,7 +105,7 @@ func (c *Client) ListLDAPServers(ctx context.Context, adom string) ([]LDAPServer
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/user/ldap", adom)
-	items, err := get[apiLDAPServer](ctx, c, apiURL)
+	items, err := getPaged[apiLDAPServer](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +127,8 @@ func (c *Client) ListLDAPServers(ctx context.Context, adom string) ([]LDAPServer
 
 // ListRADIUSServers retrieves RADIUS server configurations from an ADOM.
 // Credentials are intentionally excluded from the response.
-func (c *Client) ListRADIUSServers(ctx context.Context, adom string) ([]RADIUSServer, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListRADIUSServers(ctx context.Context, adom string, opts ...ListOption) ([]RADIUSServer, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -133,7 +137,7 @@ func (c *Client) ListRADIUSServers(ctx context.Context, adom string) ([]RADIUSSe
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/user/radius", adom)
-	items, err := get[apiRADIUSServer](ctx, c, apiURL)
+	items, err := getPaged[apiRADIUSServer](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

@@ -30,7 +30,8 @@ type apiPolicy struct {
 }
 
 // ListPolicyPackages retrieves all policy packages from an ADOM.
-func (c *Client) ListPolicyPackages(ctx context.Context, adom string) ([]PolicyPackage, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListPolicyPackages(ctx context.Context, adom string, opts ...ListOption) ([]PolicyPackage, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -39,7 +40,7 @@ func (c *Client) ListPolicyPackages(ctx context.Context, adom string) ([]PolicyP
 	}
 
 	apiURL := fmt.Sprintf("/pm/pkg/adom/%s", adom)
-	items, err := get[apiPolicyPackage](ctx, c, apiURL)
+	items, err := getPaged[apiPolicyPackage](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,8 @@ func (c *Client) ListPolicyPackages(ctx context.Context, adom string) ([]PolicyP
 }
 
 // ListPolicies retrieves firewall policies from a policy package.
-func (c *Client) ListPolicies(ctx context.Context, adom, pkg string) ([]Policy, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListPolicies(ctx context.Context, adom, pkg string, opts ...ListOption) ([]Policy, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -74,7 +76,7 @@ func (c *Client) ListPolicies(ctx context.Context, adom, pkg string) ([]Policy, 
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/pkg/%s/firewall/policy", adom, pkg)
-	items, err := get[apiPolicy](ctx, c, apiURL)
+	items, err := getPaged[apiPolicy](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

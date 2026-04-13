@@ -27,7 +27,12 @@ type apiAddressGroup struct {
 }
 
 // ListAddresses retrieves firewall address objects from an ADOM.
-func (c *Client) ListAddresses(ctx context.Context, adom string) ([]Address, error) {
+//
+// Pagination: this method transparently fetches every page from the
+// FortiManager API. The default page size is 1000 rows per forward
+// request; override with WithPageSize. Progress can be observed via
+// WithPageCallback. See the ListOption godoc for details.
+func (c *Client) ListAddresses(ctx context.Context, adom string, opts ...ListOption) ([]Address, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -36,7 +41,7 @@ func (c *Client) ListAddresses(ctx context.Context, adom string) ([]Address, err
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/firewall/address", adom)
-	items, err := get[apiAddress](ctx, c, apiURL)
+	items, err := getPaged[apiAddress](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +67,8 @@ func (c *Client) ListAddresses(ctx context.Context, adom string) ([]Address, err
 }
 
 // ListAddressGroups retrieves firewall address groups from an ADOM.
-func (c *Client) ListAddressGroups(ctx context.Context, adom string) ([]AddressGroup, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListAddressGroups(ctx context.Context, adom string, opts ...ListOption) ([]AddressGroup, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -71,7 +77,7 @@ func (c *Client) ListAddressGroups(ctx context.Context, adom string) ([]AddressG
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/firewall/addrgrp", adom)
-	items, err := get[apiAddressGroup](ctx, c, apiURL)
+	items, err := getPaged[apiAddressGroup](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

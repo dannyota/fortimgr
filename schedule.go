@@ -21,7 +21,8 @@ type apiScheduleOnetime struct {
 }
 
 // ListSchedulesRecurring retrieves recurring schedules from an ADOM.
-func (c *Client) ListSchedulesRecurring(ctx context.Context, adom string) ([]Schedule, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListSchedulesRecurring(ctx context.Context, adom string, opts ...ListOption) ([]Schedule, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -30,7 +31,7 @@ func (c *Client) ListSchedulesRecurring(ctx context.Context, adom string) ([]Sch
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/firewall/schedule/recurring", adom)
-	items, err := get[apiScheduleRecurring](ctx, c, apiURL)
+	items, err := getPaged[apiScheduleRecurring](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +52,8 @@ func (c *Client) ListSchedulesRecurring(ctx context.Context, adom string) ([]Sch
 }
 
 // ListSchedulesOnetime retrieves one-time schedules from an ADOM.
-func (c *Client) ListSchedulesOnetime(ctx context.Context, adom string) ([]Schedule, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListSchedulesOnetime(ctx context.Context, adom string, opts ...ListOption) ([]Schedule, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -60,7 +62,7 @@ func (c *Client) ListSchedulesOnetime(ctx context.Context, adom string) ([]Sched
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/firewall/schedule/onetime", adom)
-	items, err := get[apiScheduleOnetime](ctx, c, apiURL)
+	items, err := getPaged[apiScheduleOnetime](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

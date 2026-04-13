@@ -33,7 +33,9 @@ type apiInterface struct {
 // /dvmdb/device/<dev>/vdom.
 //
 // Pass a specific vdom name to scope the query to that VDOM.
-func (c *Client) ListInterfaces(ctx context.Context, device, vdom string) ([]Interface, error) {
+//
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListInterfaces(ctx context.Context, device, vdom string, opts ...ListOption) ([]Interface, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -50,7 +52,7 @@ func (c *Client) ListInterfaces(ctx context.Context, device, vdom string) ([]Int
 		}
 		apiURL = fmt.Sprintf("/pm/config/device/%s/vdom/%s/system/interface", device, vdom)
 	}
-	items, err := get[apiInterface](ctx, c, apiURL)
+	items, err := getPaged[apiInterface](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

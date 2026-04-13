@@ -26,7 +26,8 @@ type apiIPSecPhase2 struct {
 }
 
 // ListIPSecPhase1 retrieves IPSec Phase 1 interface configurations from an ADOM.
-func (c *Client) ListIPSecPhase1(ctx context.Context, adom string) ([]IPSecPhase1, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListIPSecPhase1(ctx context.Context, adom string, opts ...ListOption) ([]IPSecPhase1, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -35,7 +36,7 @@ func (c *Client) ListIPSecPhase1(ctx context.Context, adom string) ([]IPSecPhase
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/vpn/ipsec/phase1-interface", adom)
-	items, err := get[apiIPSecPhase1](ctx, c, apiURL)
+	items, err := getPaged[apiIPSecPhase1](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -65,8 +66,9 @@ type IPSecTunnel = IPSecPhase1
 // ListIPSecTunnels is a friendlier alias for ListIPSecPhase1. It returns
 // IPSec Phase 1 interface configurations (tunnels, in FortiGate GUI terms).
 // Shares all logic with ListIPSecPhase1 — IPSecTunnel is a type alias.
-func (c *Client) ListIPSecTunnels(ctx context.Context, adom string) ([]IPSecTunnel, error) {
-	return c.ListIPSecPhase1(ctx, adom)
+// Pagination options pass through to ListIPSecPhase1.
+func (c *Client) ListIPSecTunnels(ctx context.Context, adom string, opts ...ListOption) ([]IPSecTunnel, error) {
+	return c.ListIPSecPhase1(ctx, adom, opts...)
 }
 
 // ListIPSecSelectors returns IPSec quick-mode selectors (Phase 2 entries,
@@ -75,8 +77,9 @@ func (c *Client) ListIPSecTunnels(ctx context.Context, adom string) ([]IPSecTunn
 // IPSecPhase2 so the Phase1Name -> Tunnel rename does not break existing
 // ListIPSecPhase2 callers. Both share the same API fetch and transformation
 // — this function delegates to ListIPSecPhase2 and re-labels the result.
-func (c *Client) ListIPSecSelectors(ctx context.Context, adom string) ([]IPSecSelector, error) {
-	phases, err := c.ListIPSecPhase2(ctx, adom)
+// Pagination options pass through to ListIPSecPhase2.
+func (c *Client) ListIPSecSelectors(ctx context.Context, adom string, opts ...ListOption) ([]IPSecSelector, error) {
+	phases, err := c.ListIPSecPhase2(ctx, adom, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +98,8 @@ func (c *Client) ListIPSecSelectors(ctx context.Context, adom string) ([]IPSecSe
 }
 
 // ListIPSecPhase2 retrieves IPSec Phase 2 interface configurations from an ADOM.
-func (c *Client) ListIPSecPhase2(ctx context.Context, adom string) ([]IPSecPhase2, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListIPSecPhase2(ctx context.Context, adom string, opts ...ListOption) ([]IPSecPhase2, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -104,7 +108,7 @@ func (c *Client) ListIPSecPhase2(ctx context.Context, adom string) ([]IPSecPhase
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/vpn/ipsec/phase2-interface", adom)
-	items, err := get[apiIPSecPhase2](ctx, c, apiURL)
+	items, err := getPaged[apiIPSecPhase2](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

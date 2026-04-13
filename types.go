@@ -50,6 +50,29 @@ type Device struct {
 	//
 	// For standalone FortiGates HAMembers is empty.
 	HAMembers []HAMember
+
+	// v1.1.0 license / subscription metadata.
+	//
+	// Populated from the same /dvmdb/adom/{adom}/device endpoint via a
+	// server-side fields allowlist, so no encrypted credentials transit
+	// the wire. The VMLicense* fields apply only to VM-licensed
+	// FortiGates — they stay at their zero values (0, false, or
+	// time.Time{}) for hardware appliances. The other License* fields
+	// are populated on all devices.
+	//
+	// None of these fields carries the license activation key.
+	// FortiManager does not persist activation keys; only status,
+	// capacity, expiry, and region metadata.
+	LicenseExpire       time.Time // VM license expiry; zero = perpetual / not licensed
+	LicenseOverdueSince time.Time // when VM license went overdue; zero = never
+	LicenseMaxCPU       int       // max vCPU permitted by the VM license
+	LicenseMaxRAM       int       // max RAM (MB) permitted by the VM license
+	LicenseUTMEnabled   bool      // whether the VM license includes the UTM bundle
+	LicenseType         int       // raw VM license type enum, passed through
+	LicenseInstalledAt  time.Time // when the VM license was installed; zero if never
+	LicenseLastSync     time.Time // last FortiGuard sync; zero if never
+	LicenseRegion       string    // license region (lic_region)
+	LicenseFlags        int       // license bitmask (lic_flags), passed through
 }
 
 // HAMember describes one FortiGate inside an HA cluster, as returned in the
@@ -356,6 +379,82 @@ type DeviceFirmware struct {
 	CanUpgrade     bool
 	Connected      bool
 	LicenseValid   bool
+}
+
+// ADOMRevision represents one entry in an ADOM's revision history, as
+// returned by /dvmdb/adom/{adom}/revision. Each revision is a snapshot
+// created when a change was applied (by workflow submission, install
+// preview, or manual revision). Revisions join against WorkflowSession
+// via the revid field, and against PackageInstallStatus for the "what
+// was installed when" silver view.
+type ADOMRevision struct {
+	Version   int
+	Name      string
+	Desc      string
+	CreatedBy string
+	CreatedAt time.Time
+	Locked    bool
+}
+
+// WorkflowSession represents one change request in an ADOM's workflow
+// history, as returned by /dvmdb/adom/{adom}/workflow. A workflow
+// session tracks who created a change, who submitted it for approval,
+// who audited/approved it, and which revision it produced. It is the
+// primary audit trail for change management.
+//
+// The State field is best-effort — FortiManager documentation does not
+// list the complete set of state values, so unknown ints are passed
+// through unchanged. Sessions with create, submit, and audit timestamps
+// all populated are "approved" (state 3 observed empirically).
+type WorkflowSession struct {
+	SessionID   int
+	Name        string
+	Description string
+	State       string
+	CreatedBy   string
+	CreatedAt   time.Time
+	SubmittedBy string
+	SubmittedAt time.Time
+	AuditedBy   string
+	AuditedAt   time.Time
+	RevisionID  int // joins to ADOMRevision.Version
+}
+
+// NormalizedInterface represents a FortiManager normalized interface —
+// an ADOM-level interface abstraction that policies reference by name.
+// FortiManager maps each normalized name to one or more per-device
+// physical interfaces via the Mappings slice, so a single policy using
+// "wan1" can apply to different physical interfaces on different
+// FortiGates in the same ADOM.
+//
+// Returned by /pm/config/adom/{adom}/obj/dynamic/interface.
+type NormalizedInterface struct {
+	Name           string
+	SingleIntf     bool
+	ZoneOnly       bool
+	Wildcard       bool
+	DefaultMapping bool
+	Color          int
+
+	// Mappings holds one entry per {device, vdom} scope the normalized
+	// name resolves to. A normalized interface with N scopes in its
+	// raw FMG dynamic_mapping array produces N Mappings entries — the
+	// SDK flattens the nested _scope array into individual rows for
+	// easier downstream iteration.
+	//
+	// For declared-but-unmapped normalized interfaces (the majority
+	// on most ADOMs), Mappings is empty.
+	Mappings []NormalizedInterfaceMapping
+}
+
+// NormalizedInterfaceMapping is one {device, vdom} scope of a
+// NormalizedInterface, naming the concrete physical interfaces on
+// that device/VDOM that the normalized name resolves to.
+type NormalizedInterfaceMapping struct {
+	Device        string
+	VDOM          string
+	LocalIntf     []string // local interface names on the mapped device
+	IntrazoneDeny bool
 }
 
 // PackageInstallStatus represents the install state of a policy package on

@@ -19,7 +19,8 @@ type apiVirtualIP struct {
 }
 
 // ListVirtualIPs retrieves Virtual IPs from an ADOM.
-func (c *Client) ListVirtualIPs(ctx context.Context, adom string) ([]VirtualIP, error) {
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListVirtualIPs(ctx context.Context, adom string, opts ...ListOption) ([]VirtualIP, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -28,7 +29,7 @@ func (c *Client) ListVirtualIPs(ctx context.Context, adom string) ([]VirtualIP, 
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/firewall/vip", adom)
-	items, err := get[apiVirtualIP](ctx, c, apiURL)
+	items, err := getPaged[apiVirtualIP](ctx, c, apiURL, nil, buildListConfig(opts))
 	if err != nil {
 		return nil, err
 	}

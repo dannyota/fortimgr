@@ -2,6 +2,10 @@ package fortimgr
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -35,7 +39,17 @@ func TestListDevices(t *testing.T) {
 					"conf_status": 1,
 					"dev_status": 15,
 					"last_checked": 1700000000,
-					"last_resync": 1699000000
+					"last_resync": 1699000000,
+					"vm_lic_expire": 1900000000,
+					"vm_lic_overdue_since": 0,
+					"foslic_cpu": 4,
+					"foslic_ram": 8192,
+					"foslic_utm": 1,
+					"foslic_type": 2,
+					"foslic_inst_time": 1600000000,
+					"foslic_last_sync": 1700500000,
+					"lic_flags": 17,
+					"lic_region": "EMEA"
 				},
 				{
 					"name": "fw-prod-02",
@@ -123,6 +137,38 @@ func TestListDevices(t *testing.T) {
 			t.Errorf("HAMembers should be nil for standalone device, got %+v", d.HAMembers)
 		}
 
+		// v1.1.0 license fields.
+		if !d.LicenseExpire.Equal(time.Unix(1900000000, 0).UTC()) {
+			t.Errorf("LicenseExpire = %v, want 1900000000", d.LicenseExpire)
+		}
+		if !d.LicenseOverdueSince.IsZero() {
+			t.Errorf("LicenseOverdueSince should be zero for active license, got %v", d.LicenseOverdueSince)
+		}
+		if d.LicenseMaxCPU != 4 {
+			t.Errorf("LicenseMaxCPU = %d, want 4", d.LicenseMaxCPU)
+		}
+		if d.LicenseMaxRAM != 8192 {
+			t.Errorf("LicenseMaxRAM = %d, want 8192", d.LicenseMaxRAM)
+		}
+		if !d.LicenseUTMEnabled {
+			t.Errorf("LicenseUTMEnabled should be true when foslic_utm=1")
+		}
+		if d.LicenseType != 2 {
+			t.Errorf("LicenseType = %d, want 2", d.LicenseType)
+		}
+		if !d.LicenseInstalledAt.Equal(time.Unix(1600000000, 0).UTC()) {
+			t.Errorf("LicenseInstalledAt = %v", d.LicenseInstalledAt)
+		}
+		if !d.LicenseLastSync.Equal(time.Unix(1700500000, 0).UTC()) {
+			t.Errorf("LicenseLastSync = %v", d.LicenseLastSync)
+		}
+		if d.LicenseRegion != "EMEA" {
+			t.Errorf("LicenseRegion = %q, want EMEA", d.LicenseRegion)
+		}
+		if d.LicenseFlags != 17 {
+			t.Errorf("LicenseFlags = %d, want 17", d.LicenseFlags)
+		}
+
 		d2 := devices[1]
 		// HAMode stays on the legacy ha_mode int mapping for backwards compat.
 		if d2.HAMode != "master" {
@@ -190,6 +236,97 @@ func TestListDevices(t *testing.T) {
 		}
 		if len(devices) != 0 {
 			t.Errorf("len = %d, want 0", len(devices))
+		}
+	})
+
+	t.Run("fields allowlist excludes credentials", func(t *testing.T) {
+		// Compile-time-enforced security gate: the outgoing forward request
+		// must include a fields array, and that array must NOT request any
+		// known credential field. Guards against future edits that might
+		// accidentally add adm_pass, private_key, or psk to deviceFields.
+		//
+		// This proves SDK request integrity — it does NOT prove FortiManager
+		// honors the allowlist (that's verified via live smoke capture in
+		// the release pipeline).
+		var lastBody []byte
+		mux := http.NewServeMux()
+		mux.HandleFunc("/cgi-bin/module/flatui_auth", func(w http.ResponseWriter, r *http.Request) {
+			http.SetCookie(w, &http.Cookie{Name: "HTTP_CSRF_TOKEN", Value: "test-token", Path: "/"})
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{}`))
+		})
+		mux.HandleFunc("/cgi-bin/module/forward", func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("X-CSRFToken") != "test-token" {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+			lastBody = readAll(t, r)
+			fmt.Fprintln(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[]}]}}`)
+		})
+		srv := httptest.NewServer(mux)
+		defer srv.Close()
+
+		c, err := NewClient(srv.URL, WithCredentials("u", "p"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := c.Login(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := c.ListDevices(context.Background(), "root"); err != nil {
+			t.Fatal(err)
+		}
+
+		var sent struct {
+			Params []struct {
+				URL    string   `json:"url"`
+				Fields []string `json:"fields"`
+			} `json:"params"`
+		}
+		if err := json.Unmarshal(lastBody, &sent); err != nil {
+			t.Fatalf("unmarshal sent body: %v", err)
+		}
+		if len(sent.Params) != 1 {
+			t.Fatalf("params len = %d, want 1", len(sent.Params))
+		}
+		if sent.Params[0].URL != "/dvmdb/adom/root/device" {
+			t.Errorf("url = %q", sent.Params[0].URL)
+		}
+		if len(sent.Params[0].Fields) == 0 {
+			t.Fatal("fields allowlist is empty — request would pull every field including credentials")
+		}
+
+		forbidden := map[string]struct{}{
+			"adm_pass":           {},
+			"private_key":        {},
+			"private_key_status": {},
+			"psk":                {},
+			"api-key":            {},
+			"client-secret":      {},
+			"password":           {},
+			"secretkey":          {},
+		}
+		for _, f := range sent.Params[0].Fields {
+			if _, bad := forbidden[f]; bad {
+				t.Errorf("deviceFields allowlist leaked credential field: %q", f)
+			}
+		}
+
+		// Also verify the allowlist actually contains the expected safe
+		// fields — guards against a refactor that accidentally empties it.
+		expected := []string{"name", "sn", "hostname", "conf_status", "vm_lic_expire", "foslic_cpu"}
+		for _, want := range expected {
+			found := false
+			for _, f := range sent.Params[0].Fields {
+				if f == want {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("deviceFields missing expected field %q", want)
+			}
 		}
 	})
 }

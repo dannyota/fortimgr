@@ -25,7 +25,14 @@ type apiPackageInstallStatus struct {
 // The underlying /pm/config/adom/{adom}/_package/status endpoint does not
 // expose revision numbers, install time, or modify state. Callers that
 // need that richer view should join against ADOM revision history
-// (shipping in v1.1.0).
+// returned by ListADOMRevisions.
+//
+// Pagination: this method does NOT accept ListOption arguments because
+// the underlying /pm/config/adom/{adom}/_package/status endpoint ignores
+// the range parameter — FortiManager returns the full dataset in a single
+// response regardless of any range or offset the client specifies. This
+// is by FortiManager design. Every other List* method in the SDK supports
+// WithPageSize / WithPageCallback; this one is a documented exception.
 func (c *Client) ListPackageInstallStatus(ctx context.Context, adom, pkg string) ([]PackageInstallStatus, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
@@ -38,7 +45,6 @@ func (c *Client) ListPackageInstallStatus(ctx context.Context, adom, pkg string)
 	}
 
 	apiURL := fmt.Sprintf("/pm/config/adom/%s/_package/status", adom)
-
 	var items []apiPackageInstallStatus
 	var err error
 	if pkg == "" {

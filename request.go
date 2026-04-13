@@ -184,6 +184,132 @@ func getExtra[T any](ctx context.Context, c *Client, apiURL string, extra map[st
 	return items, nil
 }
 
+// defaultPageSize is the number of rows requested per forward call
+// when a List method is invoked without WithPageSize. Chosen to balance
+// round-trip count against per-request memory/bandwidth; FortiManager
+// handles 1000-row responses comfortably on every endpoint we've tested.
+const defaultPageSize = 1000
+
+// buildListConfig applies functional List options to a fresh listConfig.
+// Always returns a config with pageSize in [1, 10000]; values outside that
+// range (or unset) fall back to defaultPageSize.
+func buildListConfig(opts []ListOption) listConfig {
+	cfg := listConfig{pageSize: defaultPageSize}
+	for _, o := range opts {
+		if o != nil {
+			o.applyList(&cfg)
+		}
+	}
+	if cfg.pageSize < 1 || cfg.pageSize > 10000 {
+		cfg.pageSize = defaultPageSize
+	}
+	return cfg
+}
+
+// maxPagedIterations is a belt-and-suspenders safety cap to prevent an
+// infinite loop in getPaged even if the dedup and count-based termination
+// checks both fail. At the default 1000-row pageSize it allows fetching
+// 10 million rows per List call, which is orders of magnitude larger than
+// any realistic FortiManager deployment.
+const maxPagedIterations = 10000
+
+// getPaged fetches every page of a list endpoint sequentially and
+// concatenates the results into a single slice of T.
+//
+// Each page request calls getExtra with extras merged against a per-page
+// range parameter: {"range": [offset, pageSize]}. The range key in extras
+// is ignored to prevent callers from overriding pagination state. Session
+// expiry between pages is transparently handled by forwardExtra's retry
+// path (login + one retry per affected page). Context cancellation is
+// respected at the boundary between pages.
+//
+// Termination (in priority order):
+//
+//  1. A page returns fewer rows than pageSize → break (normal
+//     completion, includes the empty 0-row case).
+//  2. A page returns MORE rows than pageSize → break. The endpoint
+//     ignored our range parameter and returned its full dataset on the
+//     first call; continuing would spin forever with the same result.
+//  3. A page returns EXACTLY pageSize rows that byte-match page 1 →
+//     break. This catches the other "endpoint ignores offset" pattern
+//     where the return count accidentally equals pageSize (e.g. a
+//     dataset of 2 rows fetched with WithPageSize(2) against an
+//     endpoint that ignores the offset field). Without this check we
+//     would loop forever appending duplicate rows.
+//  4. An absolute maxPagedIterations safety cap — if neither 1, 2, nor
+//     3 ever triggers, getPaged aborts and returns an error rather
+//     than spinning forever. This should never fire in practice.
+//
+// On any page error the accumulated result is discarded and (nil, err)
+// is returned — callers never receive partial data with a nil error.
+//
+// Pagination is NOT a point-in-time snapshot of FortiManager state: rows
+// added to the underlying list between two page fetches may appear in a
+// later page, and rows deleted may be skipped. Callers that need
+// consistency must serialize against concurrent writers.
+func getPaged[T any](ctx context.Context, c *Client, apiURL string, extras map[string]any, cfg listConfig) ([]T, error) {
+	var all []T
+	var page1Bytes []byte
+	offset := 0
+
+	for page := 1; page <= maxPagedIterations; page++ {
+		// Merge caller extras with the per-page range. Caller-provided
+		// "range" is deliberately ignored so pagination state can't be
+		// clobbered.
+		ext := make(map[string]any, len(extras)+1)
+		for k, v := range extras {
+			if k == "range" {
+				continue
+			}
+			ext[k] = v
+		}
+		ext["range"] = []int{offset, cfg.pageSize}
+
+		items, err := getExtra[T](ctx, c, apiURL, ext)
+		if err != nil {
+			return nil, err
+		}
+
+		// Termination rule 3 (same-data detection) — compute BEFORE
+		// appending so we don't accumulate duplicates. If page 2 (or
+		// later) returns a byte-identical page to page 1, the endpoint
+		// is ignoring our offset; stop here and return what we already
+		// appended on page 1.
+		if page > 1 && len(items) == cfg.pageSize && len(page1Bytes) > 0 {
+			currBytes, marshalErr := json.Marshal(items)
+			if marshalErr == nil && bytes.Equal(currBytes, page1Bytes) {
+				return all, nil
+			}
+		}
+		if page == 1 && len(items) == cfg.pageSize {
+			// Only snapshot page 1's bytes when the full-page case
+			// matters (returned exactly pageSize). Under-full and
+			// over-full short-circuit below without needing the snapshot.
+			if snap, marshalErr := json.Marshal(items); marshalErr == nil {
+				page1Bytes = snap
+			}
+		}
+
+		all = append(all, items...)
+
+		if cfg.onPage != nil {
+			cfg.onPage(len(all), page)
+		}
+
+		// Termination rule 1 — under-full page.
+		if len(items) < cfg.pageSize {
+			return all, nil
+		}
+		// Termination rule 2 — over-full page (endpoint ignored range).
+		if len(items) > cfg.pageSize {
+			return all, nil
+		}
+
+		offset += cfg.pageSize
+	}
+	return nil, fmt.Errorf("fortimgr: pagination exceeded safety cap of %d iterations at %s — endpoint may be broken or dataset is impossibly large", maxPagedIterations, apiURL)
+}
+
 // proxyRequest is the JSON body sent to /cgi-bin/module/flatui_proxy.
 type proxyRequest struct {
 	URL    string `json:"url"`

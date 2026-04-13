@@ -4,6 +4,32 @@ FlatUI resource coverage compared to FortiManager's official JSON-RPC API.
 
 FlatUI uses the same internal API paths as JSON-RPC — the difference is the transport layer (session + CSRF + forward envelope vs token + direct). Some resources use the `flatui_proxy` endpoint instead (see [ARCHITECTURE.md](ARCHITECTURE.md)).
 
+## 📄 Pagination (since v1.1.0)
+
+Every `List*` method transparently fetches every page from FortiManager (1000 rows per forward request by default) and returns the concatenated result. Consumers never need to reason about offsets; deployments with thousands of policies, addresses, or revisions no longer risk silent truncation.
+
+Two functional options are available on every paginated `List*` method:
+
+```go
+// Override the default 1000 rows-per-request page size.
+addrs, _ := client.ListAddresses(ctx, "root", fortimgr.WithPageSize(500))
+
+// Observe progress across pages.
+revs, _ := client.ListADOMRevisions(ctx, "root",
+    fortimgr.WithPageCallback(func(fetched, page int) {
+        log.Printf("fetched %d revisions (page %d)", fetched, page)
+    }),
+)
+```
+
+**Three methods do NOT accept pagination options** — each for a different reason documented below. Every other `List*` method accepts `WithPageSize` / `WithPageCallback`.
+
+| Method | Why no pagination |
+|---|---|
+| **`ListADOMs(ctx, all ...bool)`** | Existing `all ...bool` variadic parameter collides with `opts ...ListOption` (Go forbids two variadic parameters). ADOM count is hard-capped by the FortiManager license (~20–100 max on any deployment); paging is unnecessary. |
+| **`ListDeviceFirmware(ctx)`** | Uses `flatui_proxy` with `loadFirmwareDataGroupByVersion`, which returns an aggregated grouping structure rather than a paginatable list. Parity against `ListDevices` was verified on small fleets; behavior on fleets of 500+ devices is unverified. |
+| **`ListPackageInstallStatus(ctx, adom, pkg)`** | **FortiManager design limitation**: `/pm/config/adom/{adom}/_package/status` ignores the `range` parameter — passing `range:[999999,1]` still returns the full dataset. The endpoint always returns every row in one response, so accepting page options would be misleading. Callers that want a filtered result can still pass `pkg` to apply a server-side `filter` clause. |
+
 ## 🔐 Authentication
 
 | Feature | JSON-RPC Endpoint | FlatUI Endpoint | Status |
@@ -19,6 +45,8 @@ FlatUI uses the same internal API paths as JSON-RPC — the difference is the tr
 | Resource | SDK Method | API Endpoint | Transport | Status |
 |----------|-----------|--------------|-----------|:------:|
 | ADOMs | `ListADOMs()` | `/dvmdb/adom` | forward | Done |
+| ADOM revision history | `ListADOMRevisions(adom)` | `/dvmdb/adom/{adom}/revision` | forward | Done |
+| Workflow sessions | `ListWorkflowSessions(adom)` | `/dvmdb/adom/{adom}/workflow` | forward | Done |
 | System status | `SystemStatus()` | `/gui/sys/config` | proxy | Done |
 | Device firmware | `ListDeviceFirmware()` | `/gui/adom/dvm/firmware/management` | proxy | Done |
 | HA cluster status | — | `/sys/ha/status` | — | — |
@@ -31,13 +59,14 @@ FlatUI uses the same internal API paths as JSON-RPC — the difference is the tr
 | Devices | `ListDevices(adom)` | `/dvmdb/adom/{adom}/device` | Done¹ |
 | VDOMs | `ListVDOMs(device)` | `/dvmdb/device/{device}/vdom` | Done |
 | Interfaces | `ListInterfaces(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/system/interface` | Done |
+| Normalized interfaces | `ListNormalizedInterfaces(adom)` | `/pm/config/adom/{adom}/obj/dynamic/interface` | Done |
 | Static routes | `ListStaticRoutes(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/router/static` | Done |
 | Zones | `ListZones(adom)` | `/pm/config/adom/{adom}/obj/system/zone` | Done |
 | Device detail | — | `/dvmdb/device/{device}` | — |
 
 Write operations (`add/device`, `del/device`) — not supported (read-only SDK).
 
-¹ Since v1.0.3, `Device` carries extra sync-state fields from the same endpoint: `Hostname`, `ConfStatus` (`"unknown"` / `"insync"` / `"modified"`), `DevStatus` (`"auto_updated"` / `"installed"` / `"aborted"` / …), `LastChecked`, `LastResync`, `HARole`, and `HAMembers`. `HAMembers` is a `[]HAMember` slice that exposes every FortiGate inside an HA cluster (including the standby) — FortiManager models each HA cluster as one top-level device row with the primary's hostname, so `ListDevices` never returns passive members as separate rows; they only appear inside `HAMembers`. See the godoc for the full list.
+¹ Since v1.0.3, `Device` carries extra sync-state fields from the same endpoint: `Hostname`, `ConfStatus` (`"unknown"` / `"insync"` / `"modified"`), `DevStatus` (`"auto_updated"` / `"installed"` / `"aborted"` / …), `LastChecked`, `LastResync`, `HARole`, and `HAMembers`. `HAMembers` is a `[]HAMember` slice that exposes every FortiGate inside an HA cluster (including the standby) — FortiManager models each HA cluster as one top-level device row with the primary's hostname, so `ListDevices` never returns passive members as separate rows; they only appear inside `HAMembers`. v1.1.0 adds 10 flat `License*` fields (`LicenseExpire`, `LicenseMaxCPU`, `LicenseRegion`, …) and switches the request to a server-side `fields` allowlist so encrypted device credentials (`adm_pass`, `private_key`, `psk`) never transit the wire. No activation key is exposed. See the godoc for the full list.
 
 ## 🛡️ Firewall Policy
 

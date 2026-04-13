@@ -210,6 +210,15 @@ var haRoles = map[string]string{
 	"1": "master",
 }
 
+// workflowStates maps FortiManager workflow session state ints to named
+// values. The complete enum is not documented by FortiManager; only the
+// "approved" value (3) has been observed empirically where sessions had
+// create/submit/audit timestamps all populated. Unmapped ints pass
+// through unchanged via mapEnum.
+var workflowStates = map[string]string{
+	"3": "approved",
+}
+
 var adomStates = map[string]string{
 	"0": "disabled", "1": "enabled",
 }
