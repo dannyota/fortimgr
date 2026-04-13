@@ -1,6 +1,10 @@
 package fortimgr
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+)
 
 type apiADOM struct {
 	Name  string `json:"name"`
@@ -11,10 +15,23 @@ type apiADOM struct {
 	MrNum any    `json:"mr"`
 }
 
-// ListADOMs retrieves all Administrative Domains from FortiManager.
+// apiSessionScope is the subset of /gui/sys/config used to determine which
+// ADOMs the current session can access.
+type apiSessionScope struct {
+	Adom struct {
+		Name string `json:"name"`
+	} `json:"adom"`
+	Adoms []string `json:"adoms"`
+}
+
+// ListADOMs retrieves Administrative Domains from FortiManager.
 // ADOMs partition managed devices, policies, and objects into isolated scopes.
-// Use "root" for the default ADOM in single-tenant deployments.
-func (c *Client) ListADOMs(ctx context.Context) ([]ADOM, error) {
+//
+// By default, only ADOMs accessible to the current session are returned —
+// this matches what the FMG GUI shows and excludes factory-preset ADOMs
+// the logged-in admin has no scope for. Pass all=true to return every ADOM
+// on the system (global /dvmdb/adom view, requires superadmin).
+func (c *Client) ListADOMs(ctx context.Context, all ...bool) ([]ADOM, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
@@ -46,5 +63,44 @@ func (c *Client) ListADOMs(ctx context.Context) ([]ADOM, error) {
 		}
 	}
 
-	return adoms, nil
+	if len(all) > 0 && all[0] {
+		return adoms, nil
+	}
+
+	allowed, err := c.sessionADOMScope(ctx)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]ADOM, 0, len(allowed))
+	for _, a := range adoms {
+		if _, ok := allowed[a.Name]; ok {
+			filtered = append(filtered, a)
+		}
+	}
+	return filtered, nil
+}
+
+// sessionADOMScope returns the set of ADOM names the current session can access,
+// read from /gui/sys/config (the same endpoint used by SystemStatus). The set
+// contains the current ADOM (data.adom.name) plus any additional accessible
+// ADOMs listed in data.adoms.
+func (c *Client) sessionADOMScope(ctx context.Context) (map[string]struct{}, error) {
+	data, err := c.proxy(ctx, "/gui/sys/config", "get")
+	if err != nil {
+		return nil, err
+	}
+
+	var scope apiSessionScope
+	if err := json.Unmarshal(data, &scope); err != nil {
+		return nil, fmt.Errorf("fortimgr: parse session scope: %w", err)
+	}
+
+	names := make(map[string]struct{}, len(scope.Adoms)+1)
+	if scope.Adom.Name != "" {
+		names[scope.Adom.Name] = struct{}{}
+	}
+	for _, n := range scope.Adoms {
+		names[n] = struct{}{}
+	}
+	return names, nil
 }

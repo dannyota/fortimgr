@@ -99,9 +99,9 @@ Write operations (`SET/ADD/DELETE`) — not supported (read-only SDK).
 
 | Resource | SDK Method | API Endpoint | Status |
 |----------|-----------|--------------|:------:|
-| IPSec Phase 1 | `ListIPSecPhase1(adom)` | `/pm/config/adom/{adom}/obj/vpn.ipsec/phase1-interface` | Done |
-| IPSec Phase 2 | `ListIPSecPhase2(adom)` | `/pm/config/adom/{adom}/obj/vpn.ipsec/phase2-interface` | Done |
-| SSL VPN settings | — | `/pm/config/.../vpn.ssl` | — |
+| IPSec Phase 1 | `ListIPSecPhase1(adom)` | `/pm/config/adom/{adom}/obj/vpn/ipsec/phase1-interface` | Done |
+| IPSec Phase 2 | `ListIPSecPhase2(adom)` | `/pm/config/adom/{adom}/obj/vpn/ipsec/phase2-interface` | Done |
+| SSL VPN settings | — | `/pm/config/.../vpn/ssl` | — |
 
 ## 📊 Logging & Monitoring — Future
 

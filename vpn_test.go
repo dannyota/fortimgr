@@ -16,7 +16,7 @@ func TestListIPSecPhase1(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		client := newTestClient(t, map[string]string{
-			"/pm/config/adom/root/obj/vpn.ipsec/phase1-interface": `[
+			"/pm/config/adom/root/obj/vpn/ipsec/phase1-interface": `[
 				{
 					"name": "vpn-to-branch",
 					"interface": "wan1",
@@ -92,7 +92,7 @@ func TestListIPSecPhase2(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		client := newTestClient(t, map[string]string{
-			"/pm/config/adom/root/obj/vpn.ipsec/phase2-interface": `[
+			"/pm/config/adom/root/obj/vpn/ipsec/phase2-interface": `[
 				{
 					"name": "vpn-to-branch-p2",
 					"phase1name": "vpn-to-branch",

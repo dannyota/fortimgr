@@ -99,11 +99,18 @@ func main() {
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 
-	// ADOMs.
+	// ADOMs — default call returns only ADOMs accessible to the current session.
 	adoms, err := client.ListADOMs(ctx)
 	if err != nil {
 		log.Fatalf("ListADOMs: %v", err)
 	}
+	// Global view — every ADOM on the box, including factory presets the session
+	// admin has no scope for. Useful as a diagnostic against the filtered list.
+	allADOMs, err := client.ListADOMs(ctx, true)
+	if err != nil {
+		log.Fatalf("ListADOMs(all=true): %v", err)
+	}
+	fmt.Printf("ADOMs: %d accessible / %d total\n", len(adoms), len(allADOMs))
 	fmt.Fprintf(w, "ADOM\tSTATE\tMODE\tOS VERSION\tDESCRIPTION\n")
 	for _, a := range adoms {
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
@@ -239,28 +246,41 @@ func main() {
 	phase2, err := client.ListIPSecPhase2(ctx, cfg.ADOM)
 	resources = append(resources, resource{"IPSec Phase 2", len(phase2), err})
 
-	// Device-scoped resources (VDOMs, interfaces, routes).
+	// Device-scoped resources (interfaces, routes). VDOMs are derived from the
+	// interface list's "vdom" field — this avoids /dvmdb/device/<dev>/vdom,
+	// which is permission-denied for restricted admins.
+	vdomSeen := map[string]struct{}{}
 	var allVDOMs []fortimgr.VDOM
 	var allInterfaces []fortimgr.Interface
 	var allRoutes []fortimgr.StaticRoute
 	for _, d := range devices {
-		vdoms, err := client.ListVDOMs(ctx, d.Name)
+		// Empty vdom → device-wide /global/system/interface path.
+		ifaces, err := client.ListInterfaces(ctx, d.Name, "")
 		if err != nil {
-			fmt.Printf("  VDOMs(%s): %v\n", d.Name, err)
+			fmt.Printf("  Interfaces(%s): %v\n", d.Name, err)
 			continue
 		}
-		allVDOMs = append(allVDOMs, vdoms...)
-		for _, v := range vdoms {
-			ifaces, err := client.ListInterfaces(ctx, d.Name, v.Name)
-			if err != nil {
-				fmt.Printf("  Interfaces(%s/%s): %v\n", d.Name, v.Name, err)
+		allInterfaces = append(allInterfaces, ifaces...)
+
+		// Derive unique VDOMs for this device from the interface list.
+		deviceVDOMs := map[string]struct{}{}
+		for _, iface := range ifaces {
+			if iface.VDOM == "" {
 				continue
 			}
-			allInterfaces = append(allInterfaces, ifaces...)
+			deviceVDOMs[iface.VDOM] = struct{}{}
+		}
+		for v := range deviceVDOMs {
+			key := d.Name + "/" + v
+			if _, ok := vdomSeen[key]; ok {
+				continue
+			}
+			vdomSeen[key] = struct{}{}
+			allVDOMs = append(allVDOMs, fortimgr.VDOM{Name: v, Status: "enable"})
 
-			routes, err := client.ListStaticRoutes(ctx, d.Name, v.Name)
+			routes, err := client.ListStaticRoutes(ctx, d.Name, v)
 			if err != nil {
-				fmt.Printf("  Routes(%s/%s): %v\n", d.Name, v.Name, err)
+				fmt.Printf("  Routes(%s/%s): %v\n", d.Name, v, err)
 				continue
 			}
 			allRoutes = append(allRoutes, routes...)
@@ -280,7 +300,8 @@ func main() {
 	} else {
 		fmt.Fprintf(w, "System Status\t1\t%s %s (build %d)\n", sysStatus.Hostname, sysStatus.Version, sysStatus.Build)
 	}
-	fmt.Fprintf(w, "ADOMs\t%d\tOK\n", len(adoms))
+	fmt.Fprintf(w, "ADOMs (accessible)\t%d\tOK\n", len(adoms))
+	fmt.Fprintf(w, "ADOMs (total)\t%d\tOK\n", len(allADOMs))
 	fmt.Fprintf(w, "Devices\t%d\tOK\n", len(devices))
 	fmt.Fprintf(w, "VDOMs\t%d\tOK\n", len(allVDOMs))
 	fmt.Fprintf(w, "Interfaces\t%d\tOK\n", len(allInterfaces))
@@ -303,6 +324,7 @@ func main() {
 	// Write samples for field inspection.
 	fmt.Println("Writing samples/...")
 	writeSample("adoms", adoms)
+	writeSample("adoms_all", allADOMs)
 	writeSample("devices", devices)
 	writeSample("policy_packages", pkgs)
 	writeSample("policies", firstN(allPolicies, 5))

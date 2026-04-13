@@ -23,16 +23,33 @@ type apiInterface struct {
 	Description string `json:"description"`
 }
 
-// ListInterfaces retrieves network interfaces from a device VDOM.
+// ListInterfaces retrieves network interfaces for a device.
+//
+// Pass an empty string (or "global") for vdom to use the device-wide global
+// path (/pm/config/device/<dev>/global/system/interface). This returns every
+// interface across all VDOMs in a single call, with each interface carrying
+// its own "vdom" field — callers can derive the VDOM set from the result.
+// This is the only path available to restricted admins that cannot enumerate
+// /dvmdb/device/<dev>/vdom.
+//
+// Pass a specific vdom name to scope the query to that VDOM.
 func (c *Client) ListInterfaces(ctx context.Context, device, vdom string) ([]Interface, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
 	}
-	if !validName(device) || !validName(vdom) {
-		return nil, fmt.Errorf("%w: device=%q vdom=%q", ErrInvalidName, device, vdom)
+	if !validName(device) {
+		return nil, fmt.Errorf("%w: device=%q", ErrInvalidName, device)
 	}
 
-	apiURL := fmt.Sprintf("/pm/config/device/%s/vdom/%s/system/interface", device, vdom)
+	var apiURL string
+	if vdom == "" || vdom == "global" {
+		apiURL = fmt.Sprintf("/pm/config/device/%s/global/system/interface", device)
+	} else {
+		if !validName(vdom) {
+			return nil, fmt.Errorf("%w: vdom=%q", ErrInvalidName, vdom)
+		}
+		apiURL = fmt.Sprintf("/pm/config/device/%s/vdom/%s/system/interface", device, vdom)
+	}
 	items, err := get[apiInterface](ctx, c, apiURL)
 	if err != nil {
 		return nil, err

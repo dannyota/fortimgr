@@ -34,7 +34,7 @@ func (c *Client) ListIPSecPhase1(ctx context.Context, adom string) ([]IPSecPhase
 		return nil, fmt.Errorf("%w: %q", ErrInvalidName, adom)
 	}
 
-	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/vpn.ipsec/phase1-interface", adom)
+	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/vpn/ipsec/phase1-interface", adom)
 	items, err := get[apiIPSecPhase1](ctx, c, apiURL)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (c *Client) ListIPSecPhase2(ctx context.Context, adom string) ([]IPSecPhase
 		return nil, fmt.Errorf("%w: %q", ErrInvalidName, adom)
 	}
 
-	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/vpn.ipsec/phase2-interface", adom)
+	apiURL := fmt.Sprintf("/pm/config/adom/%s/obj/vpn/ipsec/phase2-interface", adom)
 	items, err := get[apiIPSecPhase2](ctx, c, apiURL)
 	if err != nil {
 		return nil, err

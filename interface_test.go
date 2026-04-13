@@ -121,4 +121,46 @@ func TestListInterfaces(t *testing.T) {
 			t.Errorf("MTU = %d, want 9000", iface2.MTU)
 		}
 	})
+
+	t.Run("global scope", func(t *testing.T) {
+		// Empty vdom routes to /global/system/interface — the path restricted
+		// admins can use without enumerating /dvmdb/device/<dev>/vdom.
+		fixture := `[
+			{"name":"port1","vdom":"root","type":0,"status":1},
+			{"name":"port2","vdom":"root","type":0,"status":1},
+			{"name":"vlan10","vdom":"dmz","type":1,"status":1,"vlanid":10}
+		]`
+		client := newTestClient(t, map[string]string{
+			"/pm/config/device/fw-01/global/system/interface": fixture,
+		})
+
+		interfaces, err := client.ListInterfaces(context.Background(), "fw-01", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(interfaces) != 3 {
+			t.Fatalf("len = %d, want 3", len(interfaces))
+		}
+
+		// "global" alias should produce the same request.
+		interfaces2, err := client.ListInterfaces(context.Background(), "fw-01", "global")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(interfaces2) != 3 {
+			t.Fatalf("global alias len = %d, want 3", len(interfaces2))
+		}
+
+		// VDOMs are derivable from the flat list.
+		vdoms := map[string]struct{}{}
+		for _, i := range interfaces {
+			vdoms[i.VDOM] = struct{}{}
+		}
+		if _, ok := vdoms["root"]; !ok {
+			t.Error("missing derived vdom: root")
+		}
+		if _, ok := vdoms["dmz"]; !ok {
+			t.Error("missing derived vdom: dmz")
+		}
+	})
 }
