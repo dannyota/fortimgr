@@ -232,10 +232,6 @@ var adomModes = map[string]string{
 	"1": "normal", "2": "backup",
 }
 
-var vdomOpModes = map[string]string{
-	"0": "nat", "1": "transparent",
-}
-
 var interfaceTypes = map[string]string{
 	"0": "physical", "1": "vlan", "2": "aggregate", "3": "redundant",
 	"4": "tunnel", "5": "wireless", "6": "vdom-link", "7": "loopback",

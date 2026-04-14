@@ -75,7 +75,7 @@ See [FEATURES.md](docs/FEATURES.md) for full coverage and JSON-RPC comparison.
 | Category | Resources | Count |
 |----------|-----------|:-----:|
 | System | ADOMs, System Status, Device Firmware | 3 |
-| Device Management | Devices, VDOMs, Interfaces, Static Routes, Zones | 5 |
+| Device Management | Devices, Interfaces, Static Routes, Zones | 4 |
 | Firewall Policy | Policy Packages, Policies | 2 |
 | Firewall Objects | Addresses, Address Groups, Services, Service Groups, Virtual IPs, IP Pools | 6 |
 | Scheduling | Recurring Schedules, One-time Schedules | 2 |

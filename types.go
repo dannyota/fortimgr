@@ -195,13 +195,6 @@ type Zone struct {
 	Description string
 }
 
-// VDOM represents a Virtual Domain on a FortiGate device.
-type VDOM struct {
-	Name   string
-	Status string // "enable", "disable"
-	OpMode string // "nat", "transparent"
-}
-
 // Interface represents a network interface on a FortiGate device.
 type Interface struct {
 	Name        string

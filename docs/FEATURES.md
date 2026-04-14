@@ -57,7 +57,7 @@ revs, _ := client.ListADOMRevisions(ctx, "root",
 | Resource | SDK Method | API Endpoint | Status |
 |----------|-----------|--------------|:------:|
 | Devices | `ListDevices(adom)` | `/dvmdb/adom/{adom}/device` | Done¹ |
-| VDOMs | `ListVDOMs(device)` | `/dvmdb/device/{device}/vdom` | Done |
+| VDOMs | — | `/dvmdb/device/{device}/vdom` | Removed² |
 | Interfaces | `ListInterfaces(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/system/interface` | Done |
 | Normalized interfaces | `ListNormalizedInterfaces(adom)` | `/pm/config/adom/{adom}/obj/dynamic/interface` | Done |
 | Static routes | `ListStaticRoutes(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/router/static` | Done |
@@ -65,6 +65,8 @@ revs, _ := client.ListADOMRevisions(ctx, "root",
 | Device detail | — | `/dvmdb/device/{device}` | — |
 
 Write operations (`add/device`, `del/device`) — not supported (read-only SDK).
+
+² `ListVDOMs` was removed in v1.2.1. The underlying `/dvmdb/device/{device}/vdom` is a JSON-RPC endpoint that does not work through the FlatUI transport. VDOM names are available as the `VDOM` field on `Interface`, `NormalizedInterfaceMapping`, and `PackageInstallStatus`. Pass the vdom name to `ListInterfaces` and `ListStaticRoutes` as a string parameter (use `""` for the global/default scope).
 
 ¹ Since v1.0.3, `Device` carries extra sync-state fields from the same endpoint: `Hostname`, `ConfStatus` (`"unknown"` / `"insync"` / `"modified"`), `DevStatus` (`"auto_updated"` / `"installed"` / `"aborted"` / …), `LastChecked`, `LastResync`, `HARole`, and `HAMembers`. `HAMembers` is a `[]HAMember` slice that exposes every FortiGate inside an HA cluster (including the standby) — FortiManager models each HA cluster as one top-level device row with the primary's hostname, so `ListDevices` never returns passive members as separate rows; they only appear inside `HAMembers`. v1.1.0 adds 10 flat `License*` fields (`LicenseExpire`, `LicenseMaxCPU`, `LicenseRegion`, …) and switches the request to a server-side `fields` allowlist so encrypted device credentials (`adm_pass`, `private_key`, `psk`) never transit the wire. No activation key is exposed. See the godoc for the full list.
 
@@ -150,7 +152,7 @@ Write operations (`SET/ADD/DELETE`) — not supported (read-only SDK).
 |----------|:----:|:------:|:-----:|
 | Authentication | 3 | 2 | 5 |
 | System & Administration | 3 | 2 | 5 |
-| Device Management | 5 | 1 | 6 |
+| Device Management | 4 | 1 | 5 |
 | Firewall Policy | 5 | 1 | 6 |
 | Firewall Objects | 6 | 0 | 6 |
 | Scheduling | 2 | 0 | 2 |
@@ -158,7 +160,7 @@ Write operations (`SET/ADD/DELETE`) — not supported (read-only SDK).
 | User & Authentication | 4 | 0 | 4 |
 | VPN | 2 | 1 | 3 |
 | Logging | 0 | 2 | 2 |
-| **Total** | **35** | **9** | **44** |
+| **Total** | **34** | **9** | **43** |
 
 ## 📋 References
 

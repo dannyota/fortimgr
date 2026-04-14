@@ -281,15 +281,13 @@ func main() {
 		}
 	}
 
-	// Device-scoped resources (interfaces, routes). VDOMs are derived from the
-	// interface list's "vdom" field — this avoids /dvmdb/device/<dev>/vdom,
-	// which is permission-denied for restricted admins.
+	// Device-scoped resources (interfaces, routes). VDOM names are derived
+	// from the interface list's "vdom" field.
 	vdomSeen := map[string]struct{}{}
-	var allVDOMs []fortimgr.VDOM
+	var allVDOMNames []string
 	var allInterfaces []fortimgr.Interface
 	var allRoutes []fortimgr.StaticRoute
 	for _, d := range devices {
-		// Empty vdom → device-wide /global/system/interface path.
 		ifaces, err := client.ListInterfaces(ctx, d.Name, "")
 		if err != nil {
 			fmt.Printf("  Interfaces(%s): %v\n", d.Name, err)
@@ -297,7 +295,6 @@ func main() {
 		}
 		allInterfaces = append(allInterfaces, ifaces...)
 
-		// Derive unique VDOMs for this device from the interface list.
 		deviceVDOMs := map[string]struct{}{}
 		for _, iface := range ifaces {
 			if iface.VDOM == "" {
@@ -311,7 +308,7 @@ func main() {
 				continue
 			}
 			vdomSeen[key] = struct{}{}
-			allVDOMs = append(allVDOMs, fortimgr.VDOM{Name: v, Status: "enable"})
+			allVDOMNames = append(allVDOMNames, d.Name+"/"+v)
 
 			routes, err := client.ListStaticRoutes(ctx, d.Name, v)
 			if err != nil {
@@ -338,7 +335,7 @@ func main() {
 	fmt.Fprintf(w, "ADOMs (accessible)\t%d\tOK\n", len(adoms))
 	fmt.Fprintf(w, "ADOMs (total)\t%d\tOK\n", len(allADOMs))
 	fmt.Fprintf(w, "Devices\t%d\tOK\n", len(devices))
-	fmt.Fprintf(w, "VDOMs\t%d\tOK\n", len(allVDOMs))
+	fmt.Fprintf(w, "VDOMs\t%d\tOK\n", len(allVDOMNames))
 	fmt.Fprintf(w, "Interfaces\t%d\tOK\n", len(allInterfaces))
 	fmt.Fprintf(w, "Static Routes\t%d\tOK\n", len(allRoutes))
 	if fwErr != nil {
@@ -387,7 +384,7 @@ func main() {
 	writeSample("adom_revisions", firstN(adomRevisions, 10))
 	writeSample("workflow_sessions", firstN(workflowSessions, 10))
 	writeSample("normalized_interfaces", firstN(normIfaces, 10))
-	writeSample("vdoms", firstN(allVDOMs, 5))
+	writeSample("vdom_names", allVDOMNames)
 	writeSample("interfaces", firstN(allInterfaces, 10))
 	writeSample("static_routes", firstN(allRoutes, 10))
 	if sysStatus != nil {
