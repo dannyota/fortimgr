@@ -1,6 +1,9 @@
 package fortimgr
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // ADOM represents an Administrative Domain in FortiManager.
 // ADOMs partition managed devices, policies, and objects into isolated scopes
@@ -418,6 +421,25 @@ type WorkflowSession struct {
 	AuditedBy   string
 	AuditedAt   time.Time
 	RevisionID  int // joins to ADOMRevision.Version
+}
+
+// PolicyRevision represents one entry in a firewall policy's per-object
+// revision history, as returned by
+// /pm/config/adom/{adom}/_objrev/pkg/{pkg}/firewall/policy/{id}.
+//
+// Each revision records a single change to the policy: who made it,
+// when, what action was taken (Action + Note), and the full policy
+// snapshot at that point in time (Config). Revisions are numbered from
+// 1 (oldest / initial creation) and ordered oldest-first.
+type PolicyRevision struct {
+	Revision  int
+	Action    string // "add", "modify", or raw int for unmapped values
+	Note      string
+	User      string
+	Timestamp time.Time
+	PolicyID  int
+	OID       int
+	Config    json.RawMessage
 }
 
 // NormalizedInterface represents a FortiManager normalized interface —

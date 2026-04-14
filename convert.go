@@ -215,6 +215,11 @@ var haRoles = map[string]string{
 // "approved" value (3) has been observed empirically where sessions had
 // create/submit/audit timestamps all populated. Unmapped ints pass
 // through unchanged via mapEnum.
+var objrevActions = map[string]string{
+	"1": "add",
+	"3": "modify",
+}
+
 var workflowStates = map[string]string{
 	"3": "approved",
 }

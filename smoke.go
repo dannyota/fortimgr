@@ -266,6 +266,21 @@ func main() {
 	normIfaces, err := client.ListNormalizedInterfaces(ctx, cfg.ADOM)
 	resources = append(resources, resource{"Normalized Interfaces", len(normIfaces), err})
 
+	// Policy revision counts + per-policy revisions for the first package.
+	var revCounts map[int]int
+	var policyRevisions []fortimgr.PolicyRevision
+	if len(pkgs) > 0 {
+		revCounts, err = client.ListPolicyRevisionCounts(ctx, cfg.ADOM, pkgs[0].Name)
+		resources = append(resources, resource{"Policy Revision Counts", len(revCounts), err})
+
+		// Pick the first policy with revisions to fetch its history.
+		for pid := range revCounts {
+			policyRevisions, err = client.ListPolicyRevisions(ctx, cfg.ADOM, pkgs[0].Name, pid)
+			resources = append(resources, resource{fmt.Sprintf("Policy Revisions (id=%d)", pid), len(policyRevisions), err})
+			break
+		}
+	}
+
 	// Device-scoped resources (interfaces, routes). VDOMs are derived from the
 	// interface list's "vdom" field — this avoids /dvmdb/device/<dev>/vdom,
 	// which is permission-denied for restricted admins.

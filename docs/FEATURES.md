@@ -76,6 +76,8 @@ Write operations (`add/device`, `del/device`) — not supported (read-only SDK).
 | Policies | `ListPolicies(adom, pkg)` | `/pm/config/adom/{adom}/pkg/{pkg}/firewall/policy` | Done |
 | Package scope | Included in package response | Same | Done |
 | Package install status | `ListPackageInstallStatus(adom, pkg)` | `/pm/config/adom/{adom}/_package/status` | Done |
+| Policy revision history | `ListPolicyRevisions(adom, pkg, policyID)` | `/pm/config/adom/{adom}/_objrev/pkg/{pkg}/firewall/policy/{id}` | Done |
+| Policy revision counts | `ListPolicyRevisionCounts(adom, pkg)` | `/pm/config/adom/{adom}/_objrev/pkg/{pkg}/firewall/policy` | Done |
 | Policy hit count | — | `EXEC /sys/hitcount` | — |
 
 Write operations (`SET/ADD/DELETE`) — not supported (read-only SDK).
@@ -149,14 +151,14 @@ Write operations (`SET/ADD/DELETE`) — not supported (read-only SDK).
 | Authentication | 3 | 2 | 5 |
 | System & Administration | 3 | 2 | 5 |
 | Device Management | 5 | 1 | 6 |
-| Firewall Policy | 3 | 1 | 4 |
+| Firewall Policy | 5 | 1 | 6 |
 | Firewall Objects | 6 | 0 | 6 |
 | Scheduling | 2 | 0 | 2 |
 | Security Profiles | 5 | 0 | 5 |
 | User & Authentication | 4 | 0 | 4 |
 | VPN | 2 | 1 | 3 |
 | Logging | 0 | 2 | 2 |
-| **Total** | **33** | **9** | **42** |
+| **Total** | **35** | **9** | **44** |
 
 ## 📋 References
 
