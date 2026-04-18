@@ -123,3 +123,54 @@ func TestListWorkflowSessions(t *testing.T) {
 		}
 	})
 }
+
+func TestListWorkflowLogs(t *testing.T) {
+	t.Run("not logged in", func(t *testing.T) {
+		c, _ := NewClient("https://example.com", WithCredentials("u", "p"))
+		_, err := c.ListWorkflowLogs(context.Background(), "root", 1)
+		if err != ErrNotLoggedIn {
+			t.Errorf("err = %v, want ErrNotLoggedIn", err)
+		}
+	})
+
+	t.Run("invalid args", func(t *testing.T) {
+		client := newTestClient(t, map[string]string{})
+		_, err := client.ListWorkflowLogs(context.Background(), "bad adom", 1)
+		if err == nil {
+			t.Fatal("want ErrInvalidName for bad ADOM")
+		}
+		_, err = client.ListWorkflowLogs(context.Background(), "root", 0)
+		if err == nil {
+			t.Fatal("want ErrInvalidName for zero session")
+		}
+	})
+
+	t.Run("success", func(t *testing.T) {
+		client := newTestClient(t, map[string]string{
+			"/dvmdb/adom/root/workflow/1/wflog": `[
+				{"oid":5975,"seq":1,"sessionid":1,"action":5,"user":"ops-alice","time":"1752464088","desc":null,"flags":0},
+				{"oid":5976,"seq":2,"sessionid":1,"action":6,"user":"sec-bob","time":1752464099,"desc":"approved","flags":1}
+			]`,
+		})
+
+		logs, err := client.ListWorkflowLogs(context.Background(), "root", 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(logs) != 2 {
+			t.Fatalf("len = %d, want 2", len(logs))
+		}
+		if logs[0].OID != 5975 || logs[0].Sequence != 1 || logs[0].SessionID != 1 || logs[0].Action != 5 {
+			t.Errorf("logs[0] = %+v", logs[0])
+		}
+		if logs[0].User != "ops-alice" {
+			t.Errorf("User = %q", logs[0].User)
+		}
+		if !logs[0].Timestamp.Equal(time.Unix(1752464088, 0).UTC()) {
+			t.Errorf("Timestamp = %v", logs[0].Timestamp)
+		}
+		if logs[1].Description != "approved" || logs[1].Flags != 1 {
+			t.Errorf("logs[1] = %+v", logs[1])
+		}
+	})
+}

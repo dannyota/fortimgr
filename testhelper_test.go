@@ -73,7 +73,7 @@ func newTestClientWithProxy(t *testing.T, forwardFixtures, proxyFixtures map[str
 			Path:  "/",
 		})
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
 	mux.HandleFunc("/cgi-bin/module/forward", func(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +97,7 @@ func newTestClientWithProxy(t *testing.T, forwardFixtures, proxyFixtures map[str
 		apiURL, _ := param["url"].(string)
 		data, ok := forwardFixtures[apiURL]
 		if !ok {
-			fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":-2,"message":"unknown url: %s"}}]}}`, apiURL)
+			_, _ = fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":-2,"message":"unknown url: %s"}}]}}`, apiURL)
 			return
 		}
 
@@ -114,7 +114,7 @@ func newTestClientWithProxy(t *testing.T, forwardFixtures, proxyFixtures map[str
 			}
 		}
 
-		fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":%s}]}}`, data)
+		_, _ = fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":%s}]}}`, data)
 	})
 
 	mux.HandleFunc("/cgi-bin/module/flatui_proxy", func(w http.ResponseWriter, r *http.Request) {
@@ -140,11 +140,11 @@ func newTestClientWithProxy(t *testing.T, forwardFixtures, proxyFixtures map[str
 			data, ok = proxyFixtures[req.URL+":"+req.Method]
 		}
 		if !ok {
-			fmt.Fprintf(w, `{"result":[{"status":{"code":-2,"message":"unknown url: %s"}}]}`, req.URL)
+			_, _ = fmt.Fprintf(w, `{"result":[{"status":{"code":-2,"message":"unknown url: %s"}}]}`, req.URL)
 			return
 		}
 
-		fmt.Fprintf(w, `{"result":[{"status":{"code":0,"message":"OK"},"data":%s}]}`, data)
+		_, _ = fmt.Fprintf(w, `{"result":[{"status":{"code":0,"message":"OK"},"data":%s}]}`, data)
 	})
 
 	server := httptest.NewServer(mux)

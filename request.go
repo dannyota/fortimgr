@@ -4,28 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"sync/atomic"
 )
 
-// forwardRequest is the JSON body sent to /cgi-bin/module/forward.
-type forwardRequest struct {
-	ID     int64          `json:"id"`
-	Method string         `json:"method"`
-	Params []forwardParam `json:"params"`
-}
-
-type forwardParam struct {
-	URL string `json:"url"`
-}
-
 // forward sends a FlatUI forward request and returns the data payload.
 // If the session has expired, it re-authenticates once and retries.
 func (c *Client) forward(ctx context.Context, apiURL string) (json.RawMessage, error) {
 	data, err := c.doForward(ctx, apiURL)
-	if err == ErrSessionExpired {
+	if errors.Is(err, ErrSessionExpired) {
 		if loginErr := c.Login(ctx); loginErr != nil {
 			return nil, fmt.Errorf("fortimgr: re-login after session expired: %w", loginErr)
 		}
@@ -36,52 +26,7 @@ func (c *Client) forward(ctx context.Context, apiURL string) (json.RawMessage, e
 
 // doForward performs a single FlatUI forward request without retry.
 func (c *Client) doForward(ctx context.Context, apiURL string) (json.RawMessage, error) {
-	payload := forwardRequest{
-		ID:     atomic.AddInt64(&c.requestID, 1),
-		Method: "get",
-		Params: []forwardParam{{URL: apiURL}},
-	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("fortimgr: marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", c.address+"/cgi-bin/module/forward", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("fortimgr: create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-CSRFToken", c.csrfToken)
-	if c.config.userAgent != "" {
-		req.Header.Set("User-Agent", c.config.userAgent)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		if isCertificateError(err) {
-			return nil, fmt.Errorf("%w: %v", ErrCertificate, err)
-		}
-		return nil, fmt.Errorf("fortimgr: send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("fortimgr: read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fortimgr: HTTP %d: %s", resp.StatusCode, string(respBody))
-	}
-
-	var result flatUIResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("fortimgr: parse response: %w", err)
-	}
-
-	return checkResponse(&result)
+	return c.doForwardExtra(ctx, apiURL, nil)
 }
 
 // get forwards a request and unmarshals the data payload into []T.
@@ -102,7 +47,7 @@ func get[T any](ctx context.Context, c *Client, apiURL string) ([]T, error) {
 // that require query-time filters.
 func (c *Client) forwardExtra(ctx context.Context, apiURL string, extra map[string]any) (json.RawMessage, error) {
 	data, err := c.doForwardExtra(ctx, apiURL, extra)
-	if err == ErrSessionExpired {
+	if errors.Is(err, ErrSessionExpired) {
 		if loginErr := c.Login(ctx); loginErr != nil {
 			return nil, fmt.Errorf("fortimgr: re-login after session expired: %w", loginErr)
 		}
@@ -127,45 +72,10 @@ func (c *Client) doForwardExtra(ctx context.Context, apiURL string, extra map[st
 		"params": []map[string]any{param},
 	}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("fortimgr: marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", c.address+"/cgi-bin/module/forward", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("fortimgr: create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-CSRFToken", c.csrfToken)
-	if c.config.userAgent != "" {
-		req.Header.Set("User-Agent", c.config.userAgent)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		if isCertificateError(err) {
-			return nil, fmt.Errorf("%w: %v", ErrCertificate, err)
-		}
-		return nil, fmt.Errorf("fortimgr: send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("fortimgr: read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fortimgr: HTTP %d: %s", resp.StatusCode, string(respBody))
-	}
-
 	var result flatUIResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("fortimgr: parse response: %w", err)
+	if err := c.postModule(ctx, "/cgi-bin/module/forward", "X-CSRFToken", payload, &result); err != nil {
+		return nil, err
 	}
-
 	return checkResponse(&result)
 }
 
@@ -325,35 +235,50 @@ type proxyResponse struct {
 // proxy sends a FlatUI proxy request and returns the data payload.
 // If the session has expired, it re-authenticates once and retries.
 func (c *Client) proxy(ctx context.Context, apiURL, method string) (json.RawMessage, error) {
-	data, err := c.doProxy(ctx, apiURL, method)
-	if err == ErrSessionExpired {
+	return c.proxyParams(ctx, apiURL, method, nil)
+}
+
+// proxyParams sends a FlatUI proxy request with an optional params object and
+// returns the data payload.
+func (c *Client) proxyParams(ctx context.Context, apiURL, method string, params any) (json.RawMessage, error) {
+	data, err := c.doProxyParams(ctx, apiURL, method, params)
+	if errors.Is(err, ErrSessionExpired) {
 		if loginErr := c.Login(ctx); loginErr != nil {
 			return nil, fmt.Errorf("fortimgr: re-login after session expired: %w", loginErr)
 		}
-		return c.doProxy(ctx, apiURL, method)
+		return c.doProxyParams(ctx, apiURL, method, params)
 	}
 	return data, err
 }
 
-// doProxy performs a single FlatUI proxy request without retry.
-func (c *Client) doProxy(ctx context.Context, apiURL, method string) (json.RawMessage, error) {
+// doProxyParams performs a single FlatUI proxy request without retry.
+func (c *Client) doProxyParams(ctx context.Context, apiURL, method string, params any) (json.RawMessage, error) {
 	payload := proxyRequest{
 		URL:    apiURL,
 		Method: method,
+		Params: params,
 	}
 
+	var result proxyResponse
+	if err := c.postModule(ctx, "/cgi-bin/module/flatui_proxy", "xsrf-token", payload, &result); err != nil {
+		return nil, err
+	}
+	return checkProxyResponse(&result)
+}
+
+func (c *Client) postModule(ctx context.Context, modulePath, csrfHeader string, payload, out any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("fortimgr: marshal request: %w", err)
+		return fmt.Errorf("fortimgr: marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.address+"/cgi-bin/module/flatui_proxy", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.address+modulePath, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("fortimgr: create request: %w", err)
+		return fmt.Errorf("fortimgr: create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("xsrf-token", c.csrfToken)
+	req.Header.Set(csrfHeader, c.csrfToken)
 	if c.config.userAgent != "" {
 		req.Header.Set("User-Agent", c.config.userAgent)
 	}
@@ -361,27 +286,25 @@ func (c *Client) doProxy(ctx context.Context, apiURL, method string) (json.RawMe
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		if isCertificateError(err) {
-			return nil, fmt.Errorf("%w: %v", ErrCertificate, err)
+			return fmt.Errorf("%w: %v", ErrCertificate, err)
 		}
-		return nil, fmt.Errorf("fortimgr: send request: %w", err)
+		return fmt.Errorf("fortimgr: send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("fortimgr: read response: %w", err)
+		return fmt.Errorf("fortimgr: read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fortimgr: HTTP %d: %s", resp.StatusCode, string(respBody))
+		return fmt.Errorf("fortimgr: HTTP %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	var result proxyResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("fortimgr: parse response: %w", err)
+	if err := json.Unmarshal(respBody, out); err != nil {
+		return fmt.Errorf("fortimgr: parse response: %w", err)
 	}
-
-	return checkProxyResponse(&result)
+	return nil
 }
 
 // checkProxyResponse validates the flatui_proxy response envelope.

@@ -266,18 +266,18 @@ func TestAutoRelogin(t *testing.T) {
 				Path:  "/",
 			})
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{}`))
+			_, _ = w.Write([]byte(`{}`))
 			return
 		}
 
 		callCount++
 		if callCount == 1 {
 			// First call: simulate session expired.
-			w.Write([]byte(`{"code":-6,"data":{}}`))
+			_, _ = w.Write([]byte(`{"code":-6,"data":{}}`))
 			return
 		}
 		// Second call (after re-login): success.
-		w.Write([]byte(`{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[]}]}}`))
+		_, _ = w.Write([]byte(`{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[]}]}}`))
 	}))
 	defer server.Close()
 

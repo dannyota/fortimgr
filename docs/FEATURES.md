@@ -22,11 +22,12 @@ revs, _ := client.ListADOMRevisions(ctx, "root",
 )
 ```
 
-**Three methods do NOT accept pagination options** — each for a different reason documented below. Every other `List*` method accepts `WithPageSize` / `WithPageCallback`.
+**Four methods do NOT accept pagination options** — each for a different reason documented below. Every other `List*` method accepts `WithPageSize` / `WithPageCallback`.
 
 | Method | Why no pagination |
 |---|---|
 | **`ListADOMs(ctx, all ...bool)`** | Existing `all ...bool` variadic parameter collides with `opts ...ListOption` (Go forbids two variadic parameters). ADOM count is hard-capped by the FortiManager license (~20–100 max on any deployment); paging is unnecessary. |
+| **`ListDeviceAssignedPackages(ctx, adom)`** | Uses `flatui_proxy` with `/gui/adoms/{adom_oid}/devices/assignedpkgs`, which returns an aggregate map keyed by device/VDOM assignment rather than a paginated list. |
 | **`ListDeviceFirmware(ctx)`** | Uses `flatui_proxy` with `loadFirmwareDataGroupByVersion`, which returns an aggregated grouping structure rather than a paginatable list. Parity against `ListDevices` was verified on small fleets; behavior on fleets of 500+ devices is unverified. |
 | **`ListPackageInstallStatus(ctx, adom, pkg)`** | **FortiManager design limitation**: `/pm/config/adom/{adom}/_package/status` ignores the `range` parameter — passing `range:[999999,1]` still returns the full dataset. The endpoint always returns every row in one response, so accepting page options would be misleading. Callers that want a filtered result can still pass `pkg` to apply a server-side `filter` clause. |
 
@@ -47,8 +48,11 @@ revs, _ := client.ListADOMRevisions(ctx, "root",
 | ADOMs | `ListADOMs()` | `/dvmdb/adom` | forward | Done |
 | ADOM revision history | `ListADOMRevisions(adom)` | `/dvmdb/adom/{adom}/revision` | forward | Done |
 | Workflow sessions | `ListWorkflowSessions(adom)` | `/dvmdb/adom/{adom}/workflow` | forward | Done |
+| Workflow logs | `ListWorkflowLogs(adom, sessionID)` | `/dvmdb/adom/{adom}/workflow/{sessionID}/wflog` | forward | Done |
 | System status | `SystemStatus()` | `/gui/sys/config` | proxy | Done |
 | Device firmware | `ListDeviceFirmware()` | `/gui/adom/dvm/firmware/management` | proxy | Done |
+| Firmware upgrade paths | `ListFirmwareUpgradePaths()` | `/gui/adom/dvm/device/firmware` | proxy | Done |
+| Device PSIRT summary | `DevicePSIRT(adom)` | `/gui/adoms/{adom_oid}/dvm/psirt` | proxy | Done |
 | HA cluster status | — | `/sys/ha/status` | — | — |
 | Admin sessions | — | `/sys/session` | — | — |
 
@@ -57,10 +61,20 @@ revs, _ := client.ListADOMRevisions(ctx, "root",
 | Resource | SDK Method | API Endpoint | Status |
 |----------|-----------|--------------|:------:|
 | Devices | `ListDevices(adom)` | `/dvmdb/adom/{adom}/device` | Done¹ |
+| Device assigned packages | `ListDeviceAssignedPackages(adom)` | `/gui/adoms/{adom_oid}/devices/assignedpkgs` | Done |
+| Device dashboard summary | `DeviceSummary(adom, device)` | `/gui/adom/dvm/device/summary` | Done |
 | VDOMs | — | `/dvmdb/device/{device}/vdom` | Removed² |
 | Interfaces | `ListInterfaces(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/system/interface` | Done |
 | Normalized interfaces | `ListNormalizedInterfaces(adom)` | `/pm/config/adom/{adom}/obj/dynamic/interface` | Done |
 | Static routes | `ListStaticRoutes(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/router/static` | Done |
+| Static IPv6 routes | `ListStaticRoutes6(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/router/static6` | Done |
+| Device DNS | `DeviceDNS(device)` | `/pm/config/device/{device}/global/system/dns` | Done |
+| Device DDNS | `ListDeviceDDNS(device)` | `/pm/config/device/{device}/global/system/ddns` | Done |
+| Device IPAM | `DeviceIPAM(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/system/ipam` | Done |
+| SD-WAN settings | `SDWANSettings(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/system/sdwan` | Done |
+| SD-WAN members | `ListSDWANMembers(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/system/sdwan/members` | Done |
+| SD-WAN services | `ListSDWANServices(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/system/sdwan/service` | Done |
+| SD-WAN duplication | `ListSDWANDuplication(device, vdom)` | `/pm/config/device/{device}/vdom/{vdom}/system/sdwan/duplication` | Done |
 | Zones | `ListZones(adom)` | `/pm/config/adom/{adom}/obj/system/zone` | Done |
 | Device detail | — | `/dvmdb/device/{device}` | — |
 
@@ -68,7 +82,7 @@ Write operations (`add/device`, `del/device`) — not supported (read-only SDK).
 
 ² `ListVDOMs` was removed in v1.2.1. The underlying `/dvmdb/device/{device}/vdom` is a JSON-RPC endpoint that does not work through the FlatUI transport. VDOM names are available as the `VDOM` field on `Interface`, `NormalizedInterfaceMapping`, and `PackageInstallStatus`. Pass the vdom name to `ListInterfaces` and `ListStaticRoutes` as a string parameter (use `""` for the global/default scope).
 
-¹ Since v1.0.3, `Device` carries extra sync-state fields from the same endpoint: `Hostname`, `ConfStatus` (`"unknown"` / `"insync"` / `"modified"`), `DevStatus` (`"auto_updated"` / `"installed"` / `"aborted"` / …), `LastChecked`, `LastResync`, `HARole`, and `HAMembers`. `HAMembers` is a `[]HAMember` slice that exposes every FortiGate inside an HA cluster (including the standby) — FortiManager models each HA cluster as one top-level device row with the primary's hostname, so `ListDevices` never returns passive members as separate rows; they only appear inside `HAMembers`. v1.1.0 adds 10 flat `License*` fields (`LicenseExpire`, `LicenseMaxCPU`, `LicenseRegion`, …) and switches the request to a server-side `fields` allowlist so encrypted device credentials (`adm_pass`, `private_key`, `psk`) never transit the wire. No activation key is exposed. See the godoc for the full list.
+¹ Since v1.0.3, `Device` carries extra sync-state fields from the same endpoint: `Hostname`, `ConfStatus` (`"unknown"` / `"insync"` / `"modified"`), `DevStatus` (`"auto_updated"` / `"installed"` / `"aborted"` / …), `LastChecked`, `LastResync`, `HATopology`, `HARole`, and `HAMembers`. `HAMode` remains the legacy backwards-compatible field (`"standalone"` / `"master"` / `"slave"`); new code should use `HATopology` (`"standalone"` / `"active-passive"` / `"active-active"`) plus `HARole` for the split model. `HAMembers` is a `[]HAMember` slice that exposes every FortiGate inside an HA cluster (including the standby) — FortiManager models each HA cluster as one top-level device row with the primary's hostname, so `ListDevices` never returns passive members as separate rows; they only appear inside `HAMembers`. v1.1.0 adds 10 flat `License*` fields (`LicenseExpire`, `LicenseMaxCPU`, `LicenseRegion`, …) and switches the request to a server-side `fields` allowlist so encrypted device credentials (`adm_pass`, `private_key`, `psk`) never transit the wire. No activation key is exposed. See the godoc for the full list.
 
 ## 🛡️ Firewall Policy
 
@@ -89,11 +103,23 @@ Write operations (`SET/ADD/DELETE`) — not supported (read-only SDK).
 | Resource | SDK Method | API Endpoint | Status |
 |----------|-----------|--------------|:------:|
 | Addresses | `ListAddresses(adom)` | `/pm/config/adom/{adom}/obj/firewall/address` | Done |
+| IPv6 addresses | `ListAddresses6(adom)` | `/pm/config/adom/{adom}/obj/firewall/address6` | Done |
 | Address groups | `ListAddressGroups(adom)` | `/pm/config/adom/{adom}/obj/firewall/addrgrp` | Done |
+| IPv6 address groups | `ListAddressGroups6(adom)` | `/pm/config/adom/{adom}/obj/firewall/addrgrp6` | Done |
 | Services | `ListServices(adom)` | `/pm/config/adom/{adom}/obj/firewall/service/custom` | Done |
 | Service groups | `ListServiceGroups(adom)` | `/pm/config/adom/{adom}/obj/firewall/service/group` | Done |
 | Virtual IPs | `ListVirtualIPs(adom)` | `/pm/config/adom/{adom}/obj/firewall/vip` | Done |
+| Virtual IP groups | `ListVirtualIPGroups(adom)` | `/pm/config/adom/{adom}/obj/firewall/vipgrp` | Done |
+| IPv6 Virtual IPs | `ListVirtualIPs6(adom)` | `/pm/config/adom/{adom}/obj/firewall/vip6` | Done |
+| IPv6 Virtual IP groups | `ListVirtualIPGroups6(adom)` | `/pm/config/adom/{adom}/obj/firewall/vipgrp6` | Done |
 | IP pools | `ListIPPools(adom)` | `/pm/config/adom/{adom}/obj/firewall/ippool` | Done |
+| IPv6 IP pools | `ListIPPools6(adom)` | `/pm/config/adom/{adom}/obj/firewall/ippool6` | Done |
+| IP pool groups | `ListIPPoolGroups(adom)` | `/pm/config/adom/{adom}/obj/firewall/ippool_grp` | Done |
+| Custom internet services | `ListInternetServiceCustom(adom)` | `/pm/config/adom/{adom}/obj/firewall/internet-service-custom` | Done |
+| Custom internet service groups | `ListInternetServiceCustomGroups(adom)` | `/pm/config/adom/{adom}/obj/firewall/internet-service-custom-group` | Done |
+| Internet service groups | `ListInternetServiceGroups(adom)` | `/pm/config/adom/{adom}/obj/firewall/internet-service-group` | Done |
+| Internet service names | `ListInternetServiceNames(adom)` | `/pm/config/adom/{adom}/obj/firewall/internet-service-name` | Done |
+| FortiGuard internet services | `ListFDSDBInternetServices(adom)` | `/pm/config/adom/{adom}/obj/_fdsdb/internet-service` | Done |
 
 ### Address Types
 
@@ -111,6 +137,7 @@ Write operations (`SET/ADD/DELETE`) — not supported (read-only SDK).
 |----------|-----------|--------------|:------:|
 | Recurring schedules | `ListSchedulesRecurring(adom)` | `/pm/config/adom/{adom}/obj/firewall/schedule/recurring` | Done |
 | One-time schedules | `ListSchedulesOnetime(adom)` | `/pm/config/adom/{adom}/obj/firewall/schedule/onetime` | Done |
+| Schedule groups | `ListScheduleGroups(adom)` | `/pm/config/adom/{adom}/obj/firewall/schedule/group` | Done |
 
 ## 🔒 Security Profiles
 
@@ -151,16 +178,16 @@ Write operations (`SET/ADD/DELETE`) — not supported (read-only SDK).
 | Category | Done | Future | Total |
 |----------|:----:|:------:|:-----:|
 | Authentication | 3 | 2 | 5 |
-| System & Administration | 3 | 2 | 5 |
-| Device Management | 4 | 1 | 5 |
+| System & Administration | 6 | 2 | 8 |
+| Device Management | 14 | 1 | 15 |
 | Firewall Policy | 5 | 1 | 6 |
-| Firewall Objects | 6 | 0 | 6 |
-| Scheduling | 2 | 0 | 2 |
+| Firewall Objects | 19 | 0 | 19 |
+| Scheduling | 3 | 0 | 3 |
 | Security Profiles | 5 | 0 | 5 |
 | User & Authentication | 4 | 0 | 4 |
 | VPN | 2 | 1 | 3 |
 | Logging | 0 | 2 | 2 |
-| **Total** | **34** | **9** | **43** |
+| **Total** | **61** | **9** | **70** |
 
 ## 📋 References
 

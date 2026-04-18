@@ -83,3 +83,48 @@ func TestListStaticRoutes(t *testing.T) {
 		}
 	})
 }
+
+func TestListStaticRoutes6(t *testing.T) {
+	t.Run("not logged in", func(t *testing.T) {
+		c, _ := NewClient("https://example.com", WithCredentials("u", "p"))
+		_, err := c.ListStaticRoutes6(context.Background(), "fw-01", "root")
+		if err != ErrNotLoggedIn {
+			t.Errorf("err = %v, want ErrNotLoggedIn", err)
+		}
+	})
+
+	t.Run("success", func(t *testing.T) {
+		client := newTestClient(t, map[string]string{
+			"/pm/config/device/fw-01/vdom/root/router/static6": `[
+				{
+					"seq-num": 1,
+					"dst": "::/0",
+					"gateway": "2001:db8::1",
+					"device": "wan1",
+					"distance": 10,
+					"priority": 0,
+					"status": 1,
+					"comment": "Default IPv6 route"
+				}
+			]`,
+		})
+
+		routes, err := client.ListStaticRoutes6(context.Background(), "fw-01", "root")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(routes) != 1 {
+			t.Fatalf("len = %d, want 1", len(routes))
+		}
+		r := routes[0]
+		if r.SeqNum != 1 || r.Dst != "::/0" || r.Gateway != "2001:db8::1" || r.Device != "wan1" {
+			t.Errorf("route = %+v", r)
+		}
+		if r.Distance != 10 || r.Priority != 0 || r.Status != "enable" {
+			t.Errorf("route status fields = %+v", r)
+		}
+		if r.Comment != "Default IPv6 route" {
+			t.Errorf("Comment = %q", r.Comment)
+		}
+	})
+}

@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.3.0
+
+Large read-only FlatUI coverage expansion based on live GUI discovery. All
+additions are backwards-compatible.
+
+### Added
+
+- Device assigned package mapping via `ListDeviceAssignedPackages`.
+- Device dashboard summary/install context via `DeviceSummary`.
+- Explicit `Device.HATopology` while preserving legacy `Device.HAMode`.
+- Workflow step logs via `ListWorkflowLogs`.
+- Firmware upgrade path matrix via `ListFirmwareUpgradePaths`.
+- Device PSIRT/vulnerability summary via `DevicePSIRT`.
+- Static IPv6 routes via `ListStaticRoutes6`.
+- Device-scoped DNS/DDNS, IPAM, and SD-WAN methods.
+- Firewall object variants for IPv6 addresses/groups, VIP groups, IPv6 VIPs,
+  IPv6 IP pools, IP pool groups, internet service objects/groups/names,
+  FortiGuard internet services, and schedule groups.
+- Live raw-vs-SDK capture test behind the `livecapture` build tag. Captures are
+  written only under ignored `samples/` paths.
+
+### Changed
+
+- `ListDeviceFirmware` now maps the stable fields present in the live firmware
+  management rows, including model/platform IDs, upgrade keys, group name,
+  status, and model-device metadata.
+- Internal FlatUI transport code now shares the common POST/request handling
+  path for `forward` and `flatui_proxy`.
+- Smoke coverage now includes the newly supported resources and avoids printing
+  the configured FortiManager address.
+
 ## v1.1.0
 
 Transparent pagination for every `List*` method, change-management audit trail, ADOM-level interface abstraction, device license metadata, and a security hardening on `ListDevices`. Every v1.0.3 symbol stays intact — all additions are backwards-compatible variadic options.
@@ -44,7 +75,7 @@ Improvements for downstream audit-warehouse consumers — policy install status,
 ### Added
 
 - **`ListPackageInstallStatus(ctx, adom, pkg string) ([]PackageInstallStatus, error)`** — new method hitting `/pm/config/adom/{adom}/_package/status`. Distinguishes package **assignment** (device on scope list) from actual **installation** (config pushed and running on the FortiGate). `pkg` is optional — empty returns every package in the ADOM, non-empty filters server-side via a `filter: ["pkg","==",pkg]` clause. `PackageInstallStatus` fields: `ADOM`, `Package`, `Device`, `VDOM`, `Status` (`"installed"` / `"modified"` / `"never"` / `"unknown"` / `"imported"`).
-- **`Device` struct additions** — `Hostname`, `ConfStatus` (`"unknown"` / `"insync"` / `"modified"`), `DevStatus` (`"none"` / `"auto_updated"` / `"installed"` / 13 others), `LastChecked` (`time.Time`, zero when `last_checked==0`), `LastResync` (same), `HARole` (`""` / `"master"` / `"slave"`), `HAMembers` (`[]HAMember`). All populated from the existing `/dvmdb/adom/{adom}/device` response — no new API calls. `HARole` is derived by matching the device name against `ha_slave[]`.
+- **`Device` struct additions** — `Hostname`, `ConfStatus` (`"unknown"` / `"insync"` / `"modified"`), `DevStatus` (`"none"` / `"auto_updated"` / `"installed"` / 13 others), `LastChecked` (`time.Time`, zero when `last_checked==0`), `LastResync` (same), `HATopology` (`"standalone"` / `"active-passive"` / `"active-active"`), `HARole` (`""` / `"master"` / `"slave"`), `HAMembers` (`[]HAMember`). All populated from the existing `/dvmdb/adom/{adom}/device` response — no new API calls. `HARole` is derived by matching the device name against `ha_slave[]`.
 - **`HAMembers` + `HAMember` type** — surface every HA cluster member (including the standby) that FortiManager knows about for a given device record. FortiManager models each HA cluster as a **single** top-level device entry with `Name`/`Hostname` set to the primary's hostname — `ListDevices` has never returned standbys as separate rows and still doesn't. `HAMembers` is the only place where passive members appear. Each entry carries `Name`, `SerialNumber`, `Role` (`"master"` / `"slave"`), `Status` (`"online"` / `"offline"`), and `ConfStatus`. Empty for standalone devices.
 - **`getExtra[T]` internal helper** — private generic wrapper alongside `get[T]`; forwards a GET whose `params[0]` merges extra fields (`filter`, `option`, …) into the payload. Used by `ListPackageInstallStatus`; existing call sites of `get[T]` are untouched.
 - **Enum maps** — `confStatuses`, `devStatuses`, `haRoles` with raw-int passthrough for unmapped values (forward-compatible with future FortiManager schema additions).
@@ -52,7 +83,7 @@ Improvements for downstream audit-warehouse consumers — policy install status,
 
 ### Notes on `HAMode` (legacy field unchanged)
 
-The existing `Device.HAMode` still maps the raw `ha_mode` int via the legacy `deviceHAModes` table (`"0": "standalone", "1": "master", "2": "slave"`) — semantically this conflates topology and role, but behavior is preserved for v1.0.x callers. New code should prefer `HARole` for the per-member role and treat `HAMode` as opaque until a future major version where `HAMode` is cleaned up to mean topology only (`"standalone"` / `"a-p"` / `"a-a"`).
+The existing `Device.HAMode` still maps the raw `ha_mode` int via the legacy `deviceHAModes` table (`"0": "standalone", "1": "master", "2": "slave"`) — semantically this conflates topology and role, but behavior is preserved for existing callers. New code should prefer `HATopology` for topology and `HARole` for the per-member role.
 
 ### Known gaps (planned for v1.1.0)
 

@@ -21,6 +21,17 @@ type apiWorkflowSession struct {
 	Flags      int    `json:"flags"`
 }
 
+type apiWorkflowLog struct {
+	OID       int    `json:"oid"`
+	Seq       int    `json:"seq"`
+	SessionID int    `json:"sessionid"`
+	Action    int    `json:"action"`
+	User      string `json:"user"`
+	Time      any    `json:"time"`
+	Desc      string `json:"desc"`
+	Flags     int    `json:"flags"`
+}
+
 // ListWorkflowSessions returns the workflow audit trail for an ADOM —
 // every change request FortiManager has recorded, along with its
 // creator, submitter, approver, and resulting revision ID. This is the
@@ -71,4 +82,37 @@ func (c *Client) ListWorkflowSessions(ctx context.Context, adom string, opts ...
 		}
 	}
 	return sessions, nil
+}
+
+// ListWorkflowLogs returns the per-step audit log for one workflow session.
+//
+// Pagination is applied transparently; see WithPageSize / WithPageCallback.
+func (c *Client) ListWorkflowLogs(ctx context.Context, adom string, sessionID int, opts ...ListOption) ([]WorkflowLog, error) {
+	if !c.LoggedIn() {
+		return nil, ErrNotLoggedIn
+	}
+	if !validName(adom) || sessionID <= 0 {
+		return nil, fmt.Errorf("%w: adom=%q sessionID=%d", ErrInvalidName, adom, sessionID)
+	}
+
+	apiURL := fmt.Sprintf("/dvmdb/adom/%s/workflow/%d/wflog", adom, sessionID)
+	items, err := getPaged[apiWorkflowLog](ctx, c, apiURL, nil, buildListConfig(opts))
+	if err != nil {
+		return nil, err
+	}
+
+	logs := make([]WorkflowLog, len(items))
+	for i, l := range items {
+		logs[i] = WorkflowLog{
+			OID:         l.OID,
+			Sequence:    l.Seq,
+			SessionID:   l.SessionID,
+			Action:      l.Action,
+			User:        l.User,
+			Timestamp:   unixToTime(l.Time),
+			Description: l.Desc,
+			Flags:       l.Flags,
+		}
+	}
+	return logs, nil
 }

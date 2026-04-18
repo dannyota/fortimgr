@@ -165,7 +165,7 @@ func TestPagination(t *testing.T) {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/cgi-bin/module/flatui_auth", func(w http.ResponseWriter, r *http.Request) {
 			http.SetCookie(w, &http.Cookie{Name: "HTTP_CSRF_TOKEN", Value: "tok", Path: "/"})
-			w.Write([]byte(`{}`))
+			_, _ = w.Write([]byte(`{}`))
 		})
 		mux.HandleFunc("/cgi-bin/module/forward", func(w http.ResponseWriter, r *http.Request) {
 			callCount++
@@ -184,7 +184,7 @@ func TestPagination(t *testing.T) {
 			count := int(rng[1].(float64))
 			total := 5
 			if offset >= total {
-				fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[]}]}}`)
+				_, _ = fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[]}]}}`)
 				return
 			}
 			end := offset + count
@@ -196,7 +196,7 @@ func TestPagination(t *testing.T) {
 				rows = append(rows, fmt.Sprintf(`{"name":"row-%d"}`, i))
 			}
 			data := "[" + strings.Join(rows, ",") + "]"
-			fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":%s}]}}`, data)
+			_, _ = fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":%s}]}}`, data)
 		})
 		srv := httptest.NewServer(mux)
 		defer srv.Close()
@@ -253,7 +253,7 @@ func TestPagination(t *testing.T) {
 		mux.HandleFunc("/cgi-bin/module/flatui_auth", func(w http.ResponseWriter, r *http.Request) {
 			loginCount++
 			http.SetCookie(w, &http.Cookie{Name: "HTTP_CSRF_TOKEN", Value: "tok", Path: "/"})
-			w.Write([]byte(`{}`))
+			_, _ = w.Write([]byte(`{}`))
 		})
 		mux.HandleFunc("/cgi-bin/module/forward", func(w http.ResponseWriter, r *http.Request) {
 			forwardCount++
@@ -278,14 +278,14 @@ func TestPagination(t *testing.T) {
 
 			// Page 2 (offset=count) returns session expired ONCE
 			if offset > 0 && forwardCount == 2 {
-				fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":-6,"message":"Session expired"},"data":null}]}}`)
+				_, _ = fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":-6,"message":"Session expired"},"data":null}]}}`)
 				return
 			}
 
 			// Generate a page based on offset: 6 total rows, page size = count
 			totalRows := 6
 			if offset >= totalRows {
-				fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[]}]}}`)
+				_, _ = fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[]}]}}`)
 				return
 			}
 			end := offset + count
@@ -297,7 +297,7 @@ func TestPagination(t *testing.T) {
 				rows = append(rows, fmt.Sprintf(`{"name":"row-%d"}`, i))
 			}
 			data := "[" + strings.Join(rows, ",") + "]"
-			fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":%s}]}}`, data)
+			_, _ = fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":%s}]}}`, data)
 		})
 		srv := httptest.NewServer(mux)
 		defer srv.Close()
@@ -337,11 +337,11 @@ func TestPagination(t *testing.T) {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/cgi-bin/module/flatui_auth", func(w http.ResponseWriter, r *http.Request) {
 			http.SetCookie(w, &http.Cookie{Name: "HTTP_CSRF_TOKEN", Value: "tok", Path: "/"})
-			w.Write([]byte(`{}`))
+			_, _ = w.Write([]byte(`{}`))
 		})
 		mux.HandleFunc("/cgi-bin/module/forward", func(w http.ResponseWriter, r *http.Request) {
 			callCount++
-			fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[
+			_, _ = fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[
 				{"name":"a"},{"name":"b"},{"name":"c"},{"name":"d"},{"name":"e"}
 			]}]}}`)
 		})
@@ -376,12 +376,12 @@ func TestPagination(t *testing.T) {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/cgi-bin/module/flatui_auth", func(w http.ResponseWriter, r *http.Request) {
 			http.SetCookie(w, &http.Cookie{Name: "HTTP_CSRF_TOKEN", Value: "tok", Path: "/"})
-			w.Write([]byte(`{}`))
+			_, _ = w.Write([]byte(`{}`))
 		})
 		mux.HandleFunc("/cgi-bin/module/forward", func(w http.ResponseWriter, r *http.Request) {
 			callCount++
 			// Return exactly 5 rows, regardless of offset in range.
-			fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[
+			_, _ = fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[
 				{"name":"a"},{"name":"b"},{"name":"c"},{"name":"d"},{"name":"e"}
 			]}]}}`)
 		})
@@ -413,15 +413,15 @@ func TestPagination(t *testing.T) {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/cgi-bin/module/flatui_auth", func(w http.ResponseWriter, r *http.Request) {
 			http.SetCookie(w, &http.Cookie{Name: "HTTP_CSRF_TOKEN", Value: "tok", Path: "/"})
-			w.Write([]byte(`{}`))
+			_, _ = w.Write([]byte(`{}`))
 		})
 		mux.HandleFunc("/cgi-bin/module/forward", func(w http.ResponseWriter, r *http.Request) {
 			callCount++
 			if callCount == 1 {
-				fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[{"name":"a"},{"name":"b"}]}]}}`)
+				_, _ = fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[{"name":"a"},{"name":"b"}]}]}}`)
 				return
 			}
-			fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":-11,"message":"no permission"}}]}}`)
+			_, _ = fmt.Fprint(w, `{"code":0,"data":{"result":[{"status":{"code":-11,"message":"no permission"}}]}}`)
 		})
 		srv := httptest.NewServer(mux)
 		defer srv.Close()
@@ -441,4 +441,3 @@ func TestPagination(t *testing.T) {
 		}
 	})
 }
-

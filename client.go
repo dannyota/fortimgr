@@ -123,7 +123,7 @@ func (c *Client) Login(ctx context.Context) error {
 		}
 		return fmt.Errorf("fortimgr: login request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check the actual response headers for the CSRF token, not the cookie jar.
 	// Using the jar would incorrectly find stale tokens from previous sessions.
@@ -167,7 +167,7 @@ func (c *Client) Logout(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("fortimgr: logout request: %w", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	return nil
 }
@@ -193,9 +193,9 @@ func setX509NegativeSerial() {
 			return
 		}
 		if current == "" {
-			os.Setenv("GODEBUG", "x509negativeserial=1")
+			_ = os.Setenv("GODEBUG", "x509negativeserial=1")
 		} else {
-			os.Setenv("GODEBUG", current+",x509negativeserial=1")
+			_ = os.Setenv("GODEBUG", current+",x509negativeserial=1")
 		}
 	})
 }
@@ -206,7 +206,12 @@ func validName(name string) bool {
 		return false
 	}
 	for _, r := range name {
-		if !(r >= 'a' && r <= 'z') && !(r >= 'A' && r <= 'Z') && !(r >= '0' && r <= '9') && r != '-' && r != '_' && r != '.' {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '-' || r == '_' || r == '.':
+		default:
 			return false
 		}
 	}

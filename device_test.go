@@ -104,6 +104,9 @@ func TestListDevices(t *testing.T) {
 		if d.HAMode != "standalone" {
 			t.Errorf("HAMode = %q", d.HAMode)
 		}
+		if d.HATopology != "standalone" {
+			t.Errorf("HATopology = %q, want standalone", d.HATopology)
+		}
 		if d.Status != "online" {
 			t.Errorf("Status = %q", d.Status)
 		}
@@ -173,6 +176,9 @@ func TestListDevices(t *testing.T) {
 		// HAMode stays on the legacy ha_mode int mapping for backwards compat.
 		if d2.HAMode != "master" {
 			t.Errorf("HAMode = %q, want master (legacy mapping)", d2.HAMode)
+		}
+		if d2.HATopology != "active-passive" {
+			t.Errorf("HATopology = %q, want active-passive", d2.HATopology)
 		}
 		if d2.HAClusterID != "5" {
 			t.Errorf("HAClusterID = %q", d2.HAClusterID)
@@ -253,7 +259,7 @@ func TestListDevices(t *testing.T) {
 		mux.HandleFunc("/cgi-bin/module/flatui_auth", func(w http.ResponseWriter, r *http.Request) {
 			http.SetCookie(w, &http.Cookie{Name: "HTTP_CSRF_TOKEN", Value: "test-token", Path: "/"})
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{}`))
+			_, _ = w.Write([]byte(`{}`))
 		})
 		mux.HandleFunc("/cgi-bin/module/forward", func(w http.ResponseWriter, r *http.Request) {
 			if r.Header.Get("X-CSRFToken") != "test-token" {
@@ -261,7 +267,7 @@ func TestListDevices(t *testing.T) {
 				return
 			}
 			lastBody = readAll(t, r)
-			fmt.Fprintln(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[]}]}}`)
+			_, _ = fmt.Fprintln(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":[]}]}}`)
 		})
 		srv := httptest.NewServer(mux)
 		defer srv.Close()

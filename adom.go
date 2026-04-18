@@ -8,6 +8,7 @@ import (
 
 type apiADOM struct {
 	Name  string `json:"name"`
+	OID   int    `json:"oid"`
 	Desc  string `json:"desc"`
 	State any    `json:"state"`
 	Mode  any    `json:"mode"`
@@ -103,4 +104,20 @@ func (c *Client) sessionADOMScope(ctx context.Context) (map[string]struct{}, err
 		names[n] = struct{}{}
 	}
 	return names, nil
+}
+
+// adomOID resolves an ADOM name to the FlatUI OID used by some /gui/adoms
+// endpoints. It intentionally stays internal because OIDs are not stable SDK
+// identity; public methods should continue accepting ADOM names.
+func (c *Client) adomOID(ctx context.Context, adom string) (int, error) {
+	items, err := get[apiADOM](ctx, c, "/dvmdb/adom")
+	if err != nil {
+		return 0, err
+	}
+	for _, a := range items {
+		if a.Name == adom && a.OID > 0 {
+			return a.OID, nil
+		}
+	}
+	return 0, fmt.Errorf("fortimgr: ADOM %q OID not found", adom)
 }

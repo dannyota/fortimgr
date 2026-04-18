@@ -19,12 +19,10 @@ type ADOM struct {
 
 // Device represents a FortiGate device managed by FortiManager.
 //
-// Note on HA fields: the legacy HAMode field still conflates topology and
-// role (a historical quirk preserved for backwards compatibility — see
-// deviceHAModes in convert.go). New code should read HARole for the
-// device's role and treat HAMode as opaque until a future major version
-// cleanup. The raw FortiManager API exposes ha_mode (topology) and the
-// per-member role separately; HARole is derived from ha_slave[].
+// Note on HA fields: HAMode is the legacy field and still uses the historical
+// "standalone" / "master" / "slave" mapping for backwards compatibility.
+// New code should read HATopology for cluster topology and HARole for the
+// device's role.
 type Device struct {
 	Name         string
 	DeviceID     string
@@ -32,6 +30,7 @@ type Device struct {
 	Platform     string
 	Firmware     string // format: "7.2.5-b1517"
 	HAMode       string // "standalone", "master", "slave" — legacy, kept for compat
+	HATopology   string // "standalone", "active-passive", "active-active"
 	HAClusterID  string
 	Status       string // "online", "offline"
 	IPAddress    string
@@ -90,6 +89,59 @@ type HAMember struct {
 	ConfStatus   string // "unknown", "insync", "modified"
 }
 
+// AssignedPackageRef describes a policy/profile package reference assigned to
+// a managed device or VDOM.
+type AssignedPackageRef struct {
+	Name   string
+	OID    int
+	Flags  int
+	Status int
+}
+
+// DeviceAssignedPackage describes the package/profile assignment FortiManager
+// shows in Device Manager for one device or VDOM.
+type DeviceAssignedPackage struct {
+	DeviceOID    int
+	VDOMOID      int
+	Package      AssignedPackageRef
+	FAPProfile   AssignedPackageRef
+	FExtProfile  AssignedPackageRef
+	ProfileDirty bool
+}
+
+// DeviceSummary contains the install/configuration context FortiManager shows
+// in the device dashboard. Fields stay at zero values when the current
+// FortiManager version omits them.
+type DeviceSummary struct {
+	ADOM                  string
+	Device                string
+	Hostname              string
+	SerialNumber          string
+	Firmware              string
+	ConfigStatus          string
+	TotalRevisions        int
+	LastInstalledRevision int
+	LastInstallation      string
+	LastInstallTime       time.Time
+	InstalledBy           string
+	HAMode                string
+	HAUpgradeMode         string
+	HAClusterName         string
+	HAClusterID           int
+	HAMembers             []DeviceSummaryHAMember
+}
+
+// DeviceSummaryHAMember describes one HA member as shown by the device
+// dashboard summary.
+type DeviceSummaryHAMember struct {
+	OID          int
+	Name         string
+	SerialNumber string
+	Role         string
+	Status       int
+	SyncStatus   string
+}
+
 // PolicyPackage represents a policy package in FortiManager.
 type PolicyPackage struct {
 	Name  string
@@ -138,6 +190,16 @@ type AddressGroup struct {
 	Color   int
 }
 
+// Address6 represents an IPv6 firewall address object.
+type Address6 struct {
+	Name      string
+	Type      string
+	IP6       string
+	Comment   string
+	Color     int
+	AssocIntf string
+}
+
 // Service represents a firewall service object.
 type Service struct {
 	Name     string
@@ -178,6 +240,26 @@ type VirtualIP struct {
 	Color       int
 }
 
+type VirtualIP6 struct {
+	Name        string
+	ExtIP       string
+	MappedIP    string
+	ExtIntf     string
+	PortForward string
+	Protocol    string
+	ExtPort     string
+	MappedPort  string
+	Comment     string
+	Color       int
+}
+
+type VirtualIPGroup struct {
+	Name    string
+	Members []string
+	Comment string
+	Color   int
+}
+
 // IPPool represents an IP Pool.
 type IPPool struct {
 	Name    string
@@ -185,6 +267,53 @@ type IPPool struct {
 	StartIP string
 	EndIP   string
 	Comment string
+}
+
+type IPPool6 struct {
+	Name    string
+	Type    string
+	StartIP string
+	EndIP   string
+	Comment string
+}
+
+type IPPoolGroup struct {
+	Name    string
+	Members []string
+	Comment string
+}
+
+type InternetServiceCustom struct {
+	Name    string
+	ID      int
+	Comment string
+	Entry   []string
+}
+
+type InternetServiceGroup struct {
+	Name    string
+	ID      int
+	Members []string
+	Comment string
+}
+
+type InternetServiceName struct {
+	Name string
+	ID   int
+}
+
+type FDSDBInternetService struct {
+	Name     string
+	ID       int
+	Category string
+	Protocol string
+}
+
+type ScheduleGroup struct {
+	Name    string
+	Members []string
+	Comment string
+	Color   int
 }
 
 // Zone represents a system zone (interface grouping).
@@ -225,25 +354,172 @@ type StaticRoute struct {
 	Comment  string
 }
 
+// StaticRoute6 represents an IPv6 static route entry on a FortiGate device.
+type StaticRoute6 struct {
+	SeqNum   int
+	Dst      string
+	Gateway  string
+	Device   string
+	Distance int
+	Priority int
+	Status   string // "enable", "disable"
+	Comment  string
+}
+
+// DeviceDNS represents global DNS settings on a managed FortiGate.
+type DeviceDNS struct {
+	OID                    int
+	Primary                string
+	Secondary              string
+	AltPrimary             string
+	AltSecondary           string
+	IPv6Primary            string
+	IPv6Secondary          string
+	Protocol               string
+	ServerSelectMethod     string
+	ServerHostname         []string
+	Domain                 []string
+	InterfaceSelectMethod  string
+	Interfaces             []string
+	SourceIP               string
+	Retry                  int
+	Timeout                int
+	DNSCacheLimit          int
+	DNSCacheTTL            int
+	FQDNCacheTTL           int
+	FQDNMinRefresh         int
+	FQDNMaxRefresh         int
+	CacheNotFoundResponses string
+	Log                    string
+	SSLCertificate         []string
+}
+
+// DeviceDDNS represents one DDNS entry from a managed FortiGate.
+type DeviceDDNS struct {
+	Name             string
+	DDNSDomain       string
+	MonitorInterface string
+	Server           string
+	Status           string
+	Username         string
+}
+
+// DeviceIPAM represents IPAM settings on a managed FortiGate VDOM.
+type DeviceIPAM struct {
+	OID                         int
+	Status                      string
+	ServerType                  string
+	AutomaticConflictResolution string
+	ManageLANAddresses          string
+	ManageLANExtensionAddresses string
+	ManageSSIDAddresses         string
+	RequireSubnetSizeMatch      string
+}
+
+// SDWANSettings represents SD-WAN settings on a managed FortiGate VDOM.
+// Secret fields such as health-check passwords are intentionally not exposed.
+type SDWANSettings struct {
+	OID                    int
+	Status                 string
+	LoadBalanceMode        string
+	FailDetect             string
+	AppPerfLogPeriod       int
+	DuplicationMaxNum      int
+	NeighborHoldBootTime   int
+	NeighborHoldDown       string
+	NeighborHoldDownTime   int
+	SpeedtestBypassRouting string
+	FailAlertInterfaces    []string
+	HealthChecks           []SDWANHealthCheck
+	Zones                  []SDWANZone
+}
+
+type SDWANHealthCheck struct {
+	Name                   string
+	OID                    int
+	Protocol               string
+	Server                 []string
+	Members                []int
+	Interval               int
+	Failtime               int
+	Recoverytime           int
+	Source                 string
+	Source6                string
+	SystemDNS              string
+	UpdateStaticRoute      string
+	UpdateCascadeInterface string
+	SLA                    []SDWANSLA
+}
+
+type SDWANSLA struct {
+	ID                  int
+	OID                 int
+	LatencyThreshold    int
+	JitterThreshold     int
+	PacketLossThreshold int
+	LinkCostFactor      string
+}
+
+type SDWANZone struct {
+	Name                  string
+	OID                   int
+	MinimumSLAMeetMembers int
+	ServiceSLATieBreak    string
+	ADVPNSelect           string
+}
+
+type SDWANMember struct {
+	SeqNum    int
+	Interface string
+	Gateway   string
+	Gateway6  string
+	Zone      string
+	Status    string
+	Cost      int
+	Priority  int
+	Comment   string
+}
+
+type SDWANService struct {
+	ID              int
+	Name            string
+	Mode            string
+	Status          string
+	AddressMode     string
+	InputDevice     []string
+	Source          []string
+	Destination     []string
+	InternetService string
+	PriorityMembers []string
+}
+
+type SDWANDuplication struct {
+	ID                int
+	Name              string
+	ServiceID         int
+	PacketDuplication string
+	Fields            []string
+}
+
 // AntivirusProfile represents an antivirus profile.
 type AntivirusProfile struct {
-	Name           string
-	Comment        string
-	ScanMode       string // "default", "legacy", "full"
-	FeatureSet     string // "flow", "proxy"
-	AVBlockLog     string // "enable", "disable"
-	AVVirusLog     string // "enable", "disable"
-	ExtendedLog    string // "enable", "disable"
-	AnalyticsDB    string // "enable", "disable"
-	MobileMalware  string // "enable", "disable"
+	Name          string
+	Comment       string
+	ScanMode      string // "default", "legacy", "full"
+	FeatureSet    string // "flow", "proxy"
+	AVBlockLog    string // "enable", "disable"
+	AVVirusLog    string // "enable", "disable"
+	ExtendedLog   string // "enable", "disable"
+	AnalyticsDB   string // "enable", "disable"
+	MobileMalware string // "enable", "disable"
 }
 
 // IPSSensor represents an IPS sensor.
 type IPSSensor struct {
-	Name                 string
-	Comment              string
-	ExtendedLog          string // "enable", "disable"
-	BlockMaliciousURL    string // "enable", "disable"
+	Name                  string
+	Comment               string
+	ExtendedLog           string // "enable", "disable"
+	BlockMaliciousURL     string // "enable", "disable"
 	ScanBotnetConnections string // "disable", "block", "monitor"
 }
 
@@ -261,11 +537,11 @@ type WebFilterProfile struct {
 
 // AppControlProfile represents an application control profile.
 type AppControlProfile struct {
-	Name                   string
-	Comment                string
-	ExtendedLog            string // "enable", "disable"
-	DeepAppInspection      string // "enable", "disable"
-	EnforceDefaultAppPort  string // "enable", "disable"
+	Name                     string
+	Comment                  string
+	ExtendedLog              string // "enable", "disable"
+	DeepAppInspection        string // "enable", "disable"
+	EnforceDefaultAppPort    string // "enable", "disable"
 	UnknownApplicationAction string // "pass", "block"
 	UnknownApplicationLog    string // "enable", "disable"
 	OtherApplicationAction   string // "pass", "block"
@@ -366,15 +642,77 @@ type SystemStatus struct {
 
 // DeviceFirmware represents the firmware status of a managed device.
 type DeviceFirmware struct {
-	Name           string
-	SerialNumber   string
-	Platform       string
-	CurrentVersion string
-	CurrentBuild   int
-	UpgradeVersion string
-	CanUpgrade     bool
-	Connected      bool
-	LicenseValid   bool
+	Name               string
+	DeviceOID          int
+	SerialNumber       string
+	Model              string
+	Platform           string
+	PlatformID         int
+	OSType             int
+	CurrentVersion     string
+	CurrentBuild       int
+	UpgradeVersion     string
+	UpgradeVersionKey  string
+	DownloadReleaseKey string
+	CanUpgrade         bool
+	Connected          bool
+	LicenseValid       bool
+	ModelDevice        bool
+	InvalidDate        string
+	UpgradeHistory     int
+	GroupName          string
+	Status             []string
+}
+
+// FirmwareUpgradePath represents one available firmware upgrade transition.
+type FirmwareUpgradePath struct {
+	Platform        string
+	CurrentVersion  string
+	CurrentBuild    int
+	UpgradeVersion  string
+	UpgradeBuild    int
+	BaselineVersion string
+	CurrentType     string
+	UpgradeType     string
+	CurrentEOES     time.Time
+}
+
+// DevicePSIRTReport is the firmware vulnerability summary returned by the
+// Device Manager PSIRT view.
+type DevicePSIRTReport struct {
+	ByIRNumber        map[string]PSIRTAdvisory
+	ByPlatform        map[string][]string
+	NumDevicesPerRisk map[string]int
+}
+
+type PSIRTAdvisory struct {
+	IRNumber         string
+	Title            string
+	Summary          string
+	Description      string
+	Risk             int
+	ThreatSeverity   string
+	CVE              []string
+	CVSS3            PSIRTCVSS3
+	Products         map[string][]PSIRTProductVersion
+	ImpactedProducts map[string][]PSIRTImpactedProduct
+}
+
+type PSIRTCVSS3 struct {
+	BaseScore     string
+	ScoringVector string
+}
+
+type PSIRTProductVersion struct {
+	MinimumVersion string
+	MaximumVersion string
+	UpgradeTo      string
+}
+
+type PSIRTImpactedProduct struct {
+	Major string
+	Minor string
+	Patch string
 }
 
 // ADOMRevision represents one entry in an ADOM's revision history, as
@@ -414,6 +752,19 @@ type WorkflowSession struct {
 	AuditedBy   string
 	AuditedAt   time.Time
 	RevisionID  int // joins to ADOMRevision.Version
+}
+
+// WorkflowLog represents one log line inside a workflow session, as returned by
+// /dvmdb/adom/{adom}/workflow/{sessionID}/wflog.
+type WorkflowLog struct {
+	OID         int
+	Sequence    int
+	SessionID   int
+	Action      int
+	User        string
+	Timestamp   time.Time
+	Description string
+	Flags       int
 }
 
 // PolicyRevision represents one entry in a firewall policy's per-object

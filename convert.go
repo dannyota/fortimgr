@@ -1,6 +1,7 @@
 package fortimgr
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"strconv"
@@ -52,6 +53,37 @@ func toStringSlice(v any) []string {
 	default:
 		return []string{fmt.Sprintf("%v", val)}
 	}
+}
+
+// toInt converts FortiManager's mixed numeric representations to int.
+// Returns 0 for nil, empty, and non-numeric values.
+func toInt(v any) int {
+	if v == nil {
+		return 0
+	}
+	switch val := v.(type) {
+	case int:
+		return val
+	case int64:
+		return int(val)
+	case float64:
+		return int(val)
+	case json.Number:
+		n, err := val.Int64()
+		if err == nil {
+			return int(n)
+		}
+		f, err := strconv.ParseFloat(string(val), 64)
+		if err == nil {
+			return int(f)
+		}
+	case string:
+		n, err := strconv.Atoi(strings.TrimSpace(val))
+		if err == nil {
+			return n
+		}
+	}
+	return 0
 }
 
 // formatSubnet formats subnet from FortiManager.
@@ -167,6 +199,12 @@ var ippoolTypes = map[string]string{
 
 var deviceHAModes = map[string]string{
 	"0": "standalone", "1": "master", "2": "slave",
+}
+
+var deviceHATopologies = map[string]string{
+	"0": "standalone",
+	"1": "active-passive",
+	"2": "active-active",
 }
 
 var deviceConnStates = map[string]string{
@@ -376,6 +414,12 @@ func unixToTime(v any) time.Time {
 		sec = val
 	case float64:
 		sec = int64(val)
+	case json.Number:
+		n, err := val.Int64()
+		if err != nil {
+			return time.Time{}
+		}
+		sec = n
 	case string:
 		n, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {

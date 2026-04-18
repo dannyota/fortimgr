@@ -108,6 +108,7 @@ func (c *Client) ListDevices(ctx context.Context, adom string, opts ...ListOptio
 			Platform:     d.Platform,
 			Firmware:     fmt.Sprintf("%d.%d.%d-b%d", d.OSVer, d.MrNum, d.PatchNum, d.BuildNum),
 			HAMode:       mapEnum(toString(d.HAMode), deviceHAModes),
+			HATopology:   mapEnum(toString(d.HAMode), deviceHATopologies),
 			HAClusterID:  fmt.Sprintf("%d", d.HACluster),
 			Status:       mapEnum(toString(d.ConnState), deviceConnStates),
 			IPAddress:    d.IP,

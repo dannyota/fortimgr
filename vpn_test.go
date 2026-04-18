@@ -167,8 +167,8 @@ func TestIPSecTunnelSelectorAliases(t *testing.T) {
 
 	// Type-alias interchangeability: an IPSecTunnel value is assignable to an
 	// IPSecPhase1 variable and vice-versa with no conversion.
-	var asPhase1 IPSecPhase1 = tunnels[0]
-	var asTunnel IPSecTunnel = asPhase1
+	asPhase1 := tunnels[0]
+	asTunnel := asPhase1
 	if asTunnel.Name != "t1" {
 		t.Errorf("alias round-trip failed: %+v", asTunnel)
 	}

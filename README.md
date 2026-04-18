@@ -74,11 +74,11 @@ See [FEATURES.md](docs/FEATURES.md) for full coverage and JSON-RPC comparison.
 
 | Category | Resources | Count |
 |----------|-----------|:-----:|
-| System | ADOMs, System Status, Device Firmware | 3 |
-| Device Management | Devices, Interfaces, Static Routes, Zones | 4 |
+| System | ADOMs, ADOM Revisions, Workflow Sessions, Workflow Logs, System Status, Device Firmware, Firmware Upgrade Paths, Device PSIRT | 8 |
+| Device Management | Devices, Assigned Packages, Device Summary, Interfaces, Routes, DNS/DDNS, IPAM, SD-WAN, Zones | 14 |
 | Firewall Policy | Policy Packages, Policies | 2 |
-| Firewall Objects | Addresses, Address Groups, Services, Service Groups, Virtual IPs, IP Pools | 6 |
-| Scheduling | Recurring Schedules, One-time Schedules | 2 |
+| Firewall Objects | Address/VIP/IP Pool IPv4+IPv6, Groups, Services, Internet Services | 19 |
+| Scheduling | Recurring Schedules, One-time Schedules, Schedule Groups | 3 |
 | Security Profiles | Antivirus, IPS, Web Filter, App Control, SSL/SSH | 5 |
 | User & Auth | Users, User Groups, LDAP Servers, RADIUS Servers | 4 |
 | VPN | IPSec Phase 1, IPSec Phase 2 | 2 |
