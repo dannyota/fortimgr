@@ -8,6 +8,7 @@ import (
 type apiPolicyPackage struct {
 	Name  string `json:"name"`
 	Type  string `json:"type"`
+	OID   int    `json:"oid"`
 	Scope []struct {
 		Name string `json:"name"`
 	} `json:"scope member"`
@@ -58,6 +59,7 @@ func (c *Client) ListPolicyPackages(ctx context.Context, adom string, opts ...Li
 			Name:  p.Name,
 			Type:  p.Type,
 			ADOM:  adom,
+			OID:   p.OID,
 			Scope: scope,
 		})
 	}
