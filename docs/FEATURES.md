@@ -94,7 +94,7 @@ Write operations (`add/device`, `del/device`) — not supported (read-only SDK).
 | Package install status | `ListPackageInstallStatus(adom, pkg)` | `/pm/config/adom/{adom}/_package/status` | Done |
 | Policy revision history | `ListPolicyRevisions(adom, pkg, policyID)` | `/pm/config/adom/{adom}/_objrev/pkg/{pkg}/firewall/policy/{id}` | Done |
 | Policy revision counts | `ListPolicyRevisionCounts(adom, pkg)` | `/pm/config/adom/{adom}/_objrev/pkg/{pkg}/firewall/policy` | Done |
-| Policy hit count | — | `EXEC /sys/hitcount` | — |
+| Policy hit count | `ListPolicyHitCounts(adom, adomOID, pkgOID)` | `EXEC sys/hitcount` → `sys/task/result` | Done |
 
 Write operations (`SET/ADD/DELETE`) — not supported (read-only SDK).
 

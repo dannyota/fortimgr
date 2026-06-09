@@ -11,6 +11,7 @@ import (
 // use "root" (the default ADOM).
 type ADOM struct {
 	Name  string
+	OID   int
 	Desc  string
 	State string // "enabled", "disabled"
 	Mode  string // "normal", "backup"
@@ -147,6 +148,7 @@ type PolicyPackage struct {
 	Name  string
 	Type  string
 	ADOM  string
+	OID   int
 	Scope []string // device/group assignments
 }
 

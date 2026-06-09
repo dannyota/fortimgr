@@ -57,6 +57,7 @@ func (c *Client) ListADOMs(ctx context.Context, all ...bool) ([]ADOM, error) {
 
 		adoms[i] = ADOM{
 			Name:  a.Name,
+			OID:   a.OID,
 			Desc:  a.Desc,
 			State: mapEnum(toString(a.State), adomStates),
 			Mode:  mapEnum(toString(a.Mode), adomModes),
