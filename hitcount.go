@@ -140,6 +140,60 @@ func (c *Client) ListPolicyHitCounts(ctx context.Context, adom string, adomOID, 
 	return c.GetHitCountResults(ctx, taskID)
 }
 
+// PackageHitCounts holds per-policy hit counts for one policy package.
+type PackageHitCounts struct {
+	PackageName string
+	PackageOID  int
+	Policies    []PolicyHitCount
+}
+
+// ListAllPolicyHitCounts triggers hit count refresh for multiple packages in
+// parallel (all triggers first, then poll all, then collect all results).
+// This is much faster than calling ListPolicyHitCounts sequentially when
+// there are multiple packages — wall-clock drops from N*10s to ~10s.
+func (c *Client) ListAllPolicyHitCounts(ctx context.Context, adom string, adomOID int, packages []PolicyPackage) ([]PackageHitCounts, error) {
+	if !c.LoggedIn() {
+		return nil, ErrNotLoggedIn
+	}
+
+	type taskRef struct {
+		pkg    PolicyPackage
+		taskID int
+	}
+
+	// Step 1: trigger all refreshes
+	var tasks []taskRef
+	for _, pkg := range packages {
+		taskID, err := c.RefreshHitCounts(ctx, adom, adomOID, pkg.OID)
+		if err != nil {
+			continue
+		}
+		tasks = append(tasks, taskRef{pkg: pkg, taskID: taskID})
+	}
+
+	// Step 2: poll all tasks and collect results
+	var results []PackageHitCounts
+	for _, t := range tasks {
+		if ctx.Err() != nil {
+			return results, ctx.Err()
+		}
+		if _, err := c.PollTask(ctx, t.taskID); err != nil {
+			continue
+		}
+		hits, err := c.GetHitCountResults(ctx, t.taskID)
+		if err != nil {
+			continue
+		}
+		results = append(results, PackageHitCounts{
+			PackageName: t.pkg.Name,
+			PackageOID:  t.pkg.OID,
+			Policies:    hits,
+		})
+	}
+
+	return results, nil
+}
+
 // jsonExec sends an exec request via /cgi-bin/module/flatui/json.
 // This endpoint uses the same session and xsrf-token as flatui_proxy but
 // accepts the forward-style method+params envelope with exec support.
