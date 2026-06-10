@@ -154,19 +154,25 @@ type PolicyPackage struct {
 
 // Policy represents a firewall policy.
 type Policy struct {
-	PolicyID   int
-	Name       string
-	SrcIntf    []string
-	DstIntf    []string
-	SrcAddr    []string
-	DstAddr    []string
-	Service    []string
-	Action     string
-	Schedule   string
-	NAT        string
-	Status     string
-	LogTraffic string
-	Comments   string
+	PolicyID               int
+	Name                   string
+	SrcIntf                []string
+	DstIntf                []string
+	SrcAddr                []string
+	DstAddr                []string
+	Service                []string
+	Action                 string
+	Schedule               string
+	NAT                    string
+	Status                 string
+	LogTraffic             string
+	Comments               string
+	InternetService        string
+	InternetServiceName    []string
+	InternetServiceID      []int
+	InternetServiceSrc     string
+	InternetServiceSrcName []string
+	InternetServiceSrcID   []int
 }
 
 // Address represents a firewall address object.

@@ -86,6 +86,25 @@ func toInt(v any) int {
 	return 0
 }
 
+func toIntSlice(v any) []int {
+	if v == nil {
+		return nil
+	}
+	switch val := v.(type) {
+	case []any:
+		result := make([]int, len(val))
+		for i, item := range val {
+			result[i] = toInt(item)
+		}
+		return result
+	default:
+		if n := toInt(v); n != 0 {
+			return []int{n}
+		}
+		return nil
+	}
+}
+
 // formatSubnet formats subnet from FortiManager.
 // Input: string "ip/mask" or []any{"ip", "mask"}.
 // Output: CIDR notation (e.g. "10.0.0.0/24"), host IP without /32.

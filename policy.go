@@ -15,19 +15,25 @@ type apiPolicyPackage struct {
 }
 
 type apiPolicy struct {
-	PolicyID   int    `json:"policyid"`
-	Name       string `json:"name"`
-	SrcIntf    any    `json:"srcintf"`
-	DstIntf    any    `json:"dstintf"`
-	SrcAddr    any    `json:"srcaddr"`
-	DstAddr    any    `json:"dstaddr"`
-	Service    any    `json:"service"`
-	Action     any    `json:"action"`
-	Schedule   any    `json:"schedule"`
-	NAT        any    `json:"nat"`
-	Status     any    `json:"status"`
-	LogTraffic any    `json:"logtraffic"`
-	Comments   string `json:"comments"`
+	PolicyID            int    `json:"policyid"`
+	Name                string `json:"name"`
+	SrcIntf             any    `json:"srcintf"`
+	DstIntf             any    `json:"dstintf"`
+	SrcAddr             any    `json:"srcaddr"`
+	DstAddr             any    `json:"dstaddr"`
+	Service             any    `json:"service"`
+	Action              any    `json:"action"`
+	Schedule            any    `json:"schedule"`
+	NAT                 any    `json:"nat"`
+	Status              any    `json:"status"`
+	LogTraffic          any    `json:"logtraffic"`
+	Comments            string `json:"comments"`
+	InternetService     any    `json:"internet-service"`
+	InternetServiceName any    `json:"internet-service-name"`
+	InternetServiceID   any    `json:"internet-service-id"`
+	InternetServiceSrc  any    `json:"internet-service-src"`
+	InternetServiceSrcName any `json:"internet-service-src-name"`
+	InternetServiceSrcID   any `json:"internet-service-src-id"`
 }
 
 // ListPolicyPackages retrieves all policy packages from an ADOM.
@@ -86,19 +92,25 @@ func (c *Client) ListPolicies(ctx context.Context, adom, pkg string, opts ...Lis
 	policies := make([]Policy, len(items))
 	for i, p := range items {
 		policies[i] = Policy{
-			PolicyID:   p.PolicyID,
-			Name:       p.Name,
-			SrcIntf:    toStringSlice(p.SrcIntf),
-			DstIntf:    toStringSlice(p.DstIntf),
-			SrcAddr:    toStringSlice(p.SrcAddr),
-			DstAddr:    toStringSlice(p.DstAddr),
-			Service:    toStringSlice(p.Service),
-			Action:     mapEnum(toString(p.Action), policyActions),
-			Schedule:   toString(p.Schedule),
-			NAT:        mapEnum(toString(p.NAT), enableDisable),
-			Status:     mapEnum(toString(p.Status), enableDisable),
-			LogTraffic: mapEnum(toString(p.LogTraffic), logTrafficModes),
-			Comments:   p.Comments,
+			PolicyID:               p.PolicyID,
+			Name:                   p.Name,
+			SrcIntf:                toStringSlice(p.SrcIntf),
+			DstIntf:                toStringSlice(p.DstIntf),
+			SrcAddr:                toStringSlice(p.SrcAddr),
+			DstAddr:                toStringSlice(p.DstAddr),
+			Service:                toStringSlice(p.Service),
+			Action:                 mapEnum(toString(p.Action), policyActions),
+			Schedule:               toString(p.Schedule),
+			NAT:                    mapEnum(toString(p.NAT), enableDisable),
+			Status:                 mapEnum(toString(p.Status), enableDisable),
+			LogTraffic:             mapEnum(toString(p.LogTraffic), logTrafficModes),
+			Comments:               p.Comments,
+			InternetService:        mapEnum(toString(p.InternetService), enableDisable),
+			InternetServiceName:    toStringSlice(p.InternetServiceName),
+			InternetServiceID:      toIntSlice(p.InternetServiceID),
+			InternetServiceSrc:     mapEnum(toString(p.InternetServiceSrc), enableDisable),
+			InternetServiceSrcName: toStringSlice(p.InternetServiceSrcName),
+			InternetServiceSrcID:   toIntSlice(p.InternetServiceSrcID),
 		}
 	}
 
