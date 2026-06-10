@@ -55,13 +55,23 @@ func sliceFixtureByRange(fixture string, rng any) (string, bool) {
 // result[0].data). The server is cleaned up when the test finishes.
 func newTestClient(t *testing.T, fixtures map[string]string) *Client {
 	t.Helper()
-	return newTestClientWithProxy(t, fixtures, nil)
+	return newTestClientFull(t, fixtures, nil, nil)
 }
 
 // newTestClientWithProxy creates a test client with both forward and proxy fixtures.
 // forwardFixtures are served via /cgi-bin/module/forward (result[0].data).
 // proxyFixtures are served via /cgi-bin/module/flatui_proxy (result[0].data).
 func newTestClientWithProxy(t *testing.T, forwardFixtures, proxyFixtures map[string]string) *Client {
+	t.Helper()
+	return newTestClientFull(t, forwardFixtures, proxyFixtures, nil)
+}
+
+// newTestClientFull creates a test client with forward, proxy, and exec fixtures.
+// execFixtures are served via /cgi-bin/module/flatui/json keyed by the "url"
+// field inside params[0] (e.g. "sys/hitcount" → JSON data payload). If the
+// fixture is a function (via execHandlers), it receives the full params and
+// returns data dynamically.
+func newTestClientFull(t *testing.T, forwardFixtures, proxyFixtures map[string]string, execHandlers map[string]func(params map[string]any) string) *Client {
 	t.Helper()
 
 	mux := http.NewServeMux()
@@ -74,6 +84,30 @@ func newTestClientWithProxy(t *testing.T, forwardFixtures, proxyFixtures map[str
 		})
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{}`))
+	})
+
+	mux.HandleFunc("/cgi-bin/module/flatui/json", func(w http.ResponseWriter, r *http.Request) {
+		if token := r.Header.Get("xsrf-token"); token != "test-token" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+
+		var req struct {
+			Params []map[string]any `json:"params"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Params) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		param := req.Params[0]
+		apiURL, _ := param["url"].(string)
+
+		if handler, ok := execHandlers[apiURL]; ok {
+			data := handler(param)
+			_, _ = fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":0,"message":"OK"},"data":%s}]}}`, data)
+			return
+		}
+		_, _ = fmt.Fprintf(w, `{"code":0,"data":{"result":[{"status":{"code":-2,"message":"unknown exec url: %s"}}]}}`, apiURL)
 	})
 
 	mux.HandleFunc("/cgi-bin/module/forward", func(w http.ResponseWriter, r *http.Request) {

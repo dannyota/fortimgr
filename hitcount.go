@@ -124,9 +124,42 @@ func (c *Client) GetHitCountResults(ctx context.Context, taskID int) ([]PolicyHi
 	return envelope.FirewallPolicy, nil
 }
 
+// waitForStableResults re-reads the hit-count task result until the row count
+// stops growing. The FMG hit-count task dispatches sub-requests to managed
+// FortiGates; state=4 means the task container finished dispatching, but
+// device responses may still be accumulating in the result set. Two
+// consecutive reads with the same count (1s apart) confirm the result is
+// stable. At most maxStableWaits extra reads are made (then the current
+// result is returned as-is).
+func (c *Client) waitForStableResults(ctx context.Context, taskID int, initial []PolicyHitCount) ([]PolicyHitCount, error) {
+	const maxStableWaits = 10
+
+	prev := len(initial)
+	results := initial
+	for i := 0; i < maxStableWaits; i++ {
+		select {
+		case <-ctx.Done():
+			return results, ctx.Err()
+		case <-time.After(time.Second):
+		}
+
+		latest, err := c.GetHitCountResults(ctx, taskID)
+		if err != nil {
+			return results, err
+		}
+		if len(latest) == prev {
+			return latest, nil
+		}
+		results = latest
+		prev = len(latest)
+	}
+	return results, nil
+}
+
 // ListPolicyHitCounts is a convenience method that triggers a hit count
-// refresh for one policy package, polls until complete, and returns the
-// per-policy hit count results.
+// refresh for one policy package, polls until complete, waits for the result
+// set to stabilize (device responses may still arrive after state=4), and
+// returns the per-policy hit count results.
 func (c *Client) ListPolicyHitCounts(ctx context.Context, adom string, adomOID, pkgOID int) ([]PolicyHitCount, error) {
 	taskID, err := c.RefreshHitCounts(ctx, adom, adomOID, pkgOID)
 	if err != nil {
@@ -137,7 +170,12 @@ func (c *Client) ListPolicyHitCounts(ctx context.Context, adom string, adomOID, 
 		return nil, err
 	}
 
-	return c.GetHitCountResults(ctx, taskID)
+	initial, err := c.GetHitCountResults(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.waitForStableResults(ctx, taskID, initial)
 }
 
 // PackageHitCounts holds per-policy hit counts for one policy package.
@@ -148,9 +186,10 @@ type PackageHitCounts struct {
 }
 
 // ListAllPolicyHitCounts triggers hit count refresh for multiple packages in
-// parallel (all triggers first, then poll all, then collect all results).
-// This is much faster than calling ListPolicyHitCounts sequentially when
-// there are multiple packages — wall-clock drops from N*10s to ~10s.
+// parallel (all triggers first, then poll all, then collect and stabilize all
+// results). Errors on individual packages are collected and returned as a
+// joined error; successfully collected packages are always returned so the
+// caller can use partial results if it chooses.
 func (c *Client) ListAllPolicyHitCounts(ctx context.Context, adom string, adomOID int, packages []PolicyPackage) ([]PackageHitCounts, error) {
 	if !c.LoggedIn() {
 		return nil, ErrNotLoggedIn
@@ -161,27 +200,36 @@ func (c *Client) ListAllPolicyHitCounts(ctx context.Context, adom string, adomOI
 		taskID int
 	}
 
-	// Step 1: trigger all refreshes
+	// Step 1: trigger all refreshes.
 	var tasks []taskRef
+	var errs []error
 	for _, pkg := range packages {
 		taskID, err := c.RefreshHitCounts(ctx, adom, adomOID, pkg.OID)
 		if err != nil {
+			errs = append(errs, fmt.Errorf("package %q (OID %d): trigger: %w", pkg.Name, pkg.OID, err))
 			continue
 		}
 		tasks = append(tasks, taskRef{pkg: pkg, taskID: taskID})
 	}
 
-	// Step 2: poll all tasks and collect results
+	// Step 2: poll, collect, and stabilize each task's results.
 	var results []PackageHitCounts
 	for _, t := range tasks {
 		if ctx.Err() != nil {
 			return results, ctx.Err()
 		}
 		if _, err := c.PollTask(ctx, t.taskID); err != nil {
+			errs = append(errs, fmt.Errorf("package %q (OID %d): poll: %w", t.pkg.Name, t.pkg.OID, err))
 			continue
 		}
-		hits, err := c.GetHitCountResults(ctx, t.taskID)
+		initial, err := c.GetHitCountResults(ctx, t.taskID)
 		if err != nil {
+			errs = append(errs, fmt.Errorf("package %q (OID %d): results: %w", t.pkg.Name, t.pkg.OID, err))
+			continue
+		}
+		hits, err := c.waitForStableResults(ctx, t.taskID, initial)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("package %q (OID %d): stabilize: %w", t.pkg.Name, t.pkg.OID, err))
 			continue
 		}
 		results = append(results, PackageHitCounts{
@@ -191,7 +239,25 @@ func (c *Client) ListAllPolicyHitCounts(ctx context.Context, adom string, adomOI
 		})
 	}
 
+	if len(errs) > 0 {
+		return results, fmt.Errorf("fortimgr: %d/%d packages had errors: %w",
+			len(errs), len(packages), joinErrors(errs))
+	}
 	return results, nil
+}
+
+func joinErrors(errs []error) error {
+	if len(errs) == 0 {
+		return nil
+	}
+	if len(errs) == 1 {
+		return errs[0]
+	}
+	msg := errs[0].Error()
+	for _, e := range errs[1:] {
+		msg += "; " + e.Error()
+	}
+	return fmt.Errorf("%s", msg)
 }
 
 // jsonExec sends an exec request via /cgi-bin/module/flatui/json.
