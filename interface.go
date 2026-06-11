@@ -66,7 +66,7 @@ func (c *Client) ListInterfaces(ctx context.Context, device, vdom string, opts .
 			Status:      mapEnum(toString(iface.Status), interfaceStatuses),
 			Role:        mapEnum(toString(iface.Role), interfaceRoles),
 			Mode:        mapEnum(toString(iface.Mode), interfaceModes),
-			AllowAccess: strings.Join(toStringSlice(iface.AllowAccess), " "),
+			AllowAccess: strings.Join(decodeAllowAccess(iface.AllowAccess), " "),
 			VDOM:        toString(iface.VDOM),
 			Zone:        toString(iface.Zone),
 			VlanID:      iface.VlanID,
