@@ -21,6 +21,8 @@ type apiPolicy struct {
 	DstIntf             any    `json:"dstintf"`
 	SrcAddr             any    `json:"srcaddr"`
 	DstAddr             any    `json:"dstaddr"`
+	SrcAddr6            any    `json:"srcaddr6"`
+	DstAddr6            any    `json:"dstaddr6"`
 	Service             any    `json:"service"`
 	Action              any    `json:"action"`
 	Schedule            any    `json:"schedule"`
@@ -98,6 +100,8 @@ func (c *Client) ListPolicies(ctx context.Context, adom, pkg string, opts ...Lis
 			DstIntf:                toStringSlice(p.DstIntf),
 			SrcAddr:                toStringSlice(p.SrcAddr),
 			DstAddr:                toStringSlice(p.DstAddr),
+			SrcAddr6:               toStringSlice(p.SrcAddr6),
+			DstAddr6:               toStringSlice(p.DstAddr6),
 			Service:                toStringSlice(p.Service),
 			Action:                 mapEnum(toString(p.Action), policyActions),
 			Schedule:               toString(p.Schedule),

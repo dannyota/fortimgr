@@ -75,6 +75,8 @@ func TestListPolicies(t *testing.T) {
 					"dstintf": ["port2"],
 					"srcaddr": ["all"],
 					"dstaddr": ["web-servers"],
+					"srcaddr6": ["all"],
+					"dstaddr6": ["v6-web", "v6-db"],
 					"service": ["HTTP", "HTTPS"],
 					"action": "accept",
 					"schedule": "always",
@@ -128,6 +130,12 @@ func TestListPolicies(t *testing.T) {
 		if len(p.DstAddr) != 1 || p.DstAddr[0] != "web-servers" {
 			t.Errorf("DstAddr = %v", p.DstAddr)
 		}
+		if len(p.SrcAddr6) != 1 || p.SrcAddr6[0] != "all" {
+			t.Errorf("SrcAddr6 = %v, want [all]", p.SrcAddr6)
+		}
+		if len(p.DstAddr6) != 2 || p.DstAddr6[0] != "v6-web" || p.DstAddr6[1] != "v6-db" {
+			t.Errorf("DstAddr6 = %v, want [v6-web v6-db]", p.DstAddr6)
+		}
 		if len(p.Service) != 2 {
 			t.Errorf("Service = %v", p.Service)
 		}
@@ -169,6 +177,9 @@ func TestListPolicies(t *testing.T) {
 		}
 		if p2.Comments != "" {
 			t.Errorf("Comments = %q, want empty", p2.Comments)
+		}
+		if len(p2.SrcAddr6) != 0 || len(p2.DstAddr6) != 0 {
+			t.Errorf("v6 addrs = %v/%v, want empty (no srcaddr6/dstaddr6 in fixture)", p2.SrcAddr6, p2.DstAddr6)
 		}
 	})
 }

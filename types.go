@@ -160,6 +160,8 @@ type Policy struct {
 	DstIntf                []string
 	SrcAddr                []string
 	DstAddr                []string
+	SrcAddr6               []string // IPv6 source address refs (srcaddr6)
+	DstAddr6               []string // IPv6 destination address refs (dstaddr6)
 	Service                []string
 	Action                 string
 	Schedule               string
